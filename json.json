@@ -1,0 +1,5263 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "LoRA 모델 공유 플랫폼 API",
+    "description": "## LoRA 모델 학습, 생성, 공유 플랫폼 REST API 문서\n\n### 주요 기능\n- 🔐 OAuth2 Google 로그인\n- 🎨 LoRA 모델 학습 (FastAPI 연동)\n- 🖼️ 이미지 생성 (실시간 진행률 추적)\n- 💬 커뮤니티 (좋아요, 댓글, 즐겨찾기)\n- 🔍 모델 검색 및 태그 필터링\n\n### 인증 방법\n1. `/api/auth/google` 로 Google 로그인\n2. 발급받은 `accessToken`을 우측 상단 🔓 버튼에 입력\n3. 인증이 필요한 API 호출 가능\n\n### 멀티 인스턴스 고려사항\n- Stateless JWT 기반 인증\n- 파일 저장: S3 (프로덕션)\n- SSE 스트림: 인스턴스별 관리\n",
+    "contact": {
+      "name": "Rheon",
+      "url": "https://github.com/yourusername",
+      "email": "your-email@example.com"
+    },
+    "license": {
+      "name": "MIT License",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "version": "v1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "로컬 개발 서버"
+    },
+    {
+      "url": "https://api.lora-platform.com",
+      "description": "프로덕션 서버 (예시)"
+    }
+  ],
+  "security": [
+    {
+      "JWT Authentication": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Community",
+      "description": "커뮤니티 API (댓글, 좋아요, 즐겨찾기)"
+    },
+    {
+      "name": "Generation",
+      "description": "이미지 생성 API"
+    },
+    {
+      "name": "헬스 체크",
+      "description": "서버 상태 확인 API"
+    },
+    {
+      "name": "Tag",
+      "description": "태그 API"
+    },
+    {
+      "name": "User",
+      "description": "유저 API"
+    },
+    {
+      "name": "Search",
+      "description": "통합 검색 API"
+    },
+    {
+      "name": "Training",
+      "description": "학습 작업 API"
+    },
+    {
+      "name": "LoRA Model",
+      "description": "LoRA 모델 API"
+    },
+    {
+      "name": "Auth",
+      "description": "인증 API"
+    }
+  ],
+  "paths": {
+    "/api/users/me": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "내 프로필 조회",
+        "description": "현재 로그인된 유저의 프로필 정보를 조회합니다.",
+        "operationId": "getMyProfile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "summary": "내 프로필 수정",
+        "description": "현재 로그인된 유저의 프로필을 수정합니다.",
+        "operationId": "updateMyProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/jobs/{jobId}/progress": {
+      "put": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 진행률 업데이트",
+        "description": "학습 진행 상황을 업데이트합니다. (FastAPI 서버 전용)",
+        "operationId": "updateProgress",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "학습 작업 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/{tagId}/category": {
+      "put": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "태그 카테고리 수정 (관리자)",
+        "description": "태그의 카테고리를 수정합니다. (관리자만 가능)",
+        "operationId": "updateTagCategory",
+        "parameters": [
+          {
+            "name": "tagId",
+            "in": "path",
+            "description": "태그 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "모델 상세 조회",
+        "description": "모델의 상세 정보를 조회합니다. (샘플, 프롬프트, 태그 포함)",
+        "operationId": "getModelDetail",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoraModelDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "모델 수정",
+        "description": "모델 정보를 수정합니다. (작성자만 가능)",
+        "operationId": "updateModel",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "모델 삭제",
+        "description": "모델을 삭제합니다. (작성자만 가능)",
+        "operationId": "deleteModel",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/samples/{sampleId}/primary": {
+      "put": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "대표 이미지 설정",
+        "description": "샘플 이미지를 대표 이미지로 설정합니다. (작성자만 가능)",
+        "operationId": "setPrimarySample",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "sampleId",
+            "in": "path",
+            "description": "샘플 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/prompts/{promptId}": {
+      "put": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "프롬프트 수정",
+        "description": "프롬프트를 수정합니다. (작성자만 가능)",
+        "operationId": "updatePrompt",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "description": "프롬프트 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePromptResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "프롬프트 삭제",
+        "description": "프롬프트를 삭제합니다. (작성자만 가능)",
+        "operationId": "deletePrompt",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "description": "프롬프트 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/comments/{commentId}": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "댓글 상세 조회",
+        "description": "특정 댓글의 상세 정보를 조회합니다.",
+        "operationId": "getComment",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "description": "댓글 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCommentResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "댓글 수정",
+        "description": "댓글을 수정합니다. (작성자만 가능)",
+        "operationId": "updateComment",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "description": "댓글 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCommentResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "댓글 삭제",
+        "description": "댓글을 삭제합니다. (작성자만 가능)",
+        "operationId": "deleteComment",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "description": "댓글 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/models/{modelId}": {
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 작업 생성",
+        "description": "모델의 학습 작업을 생성합니다. (모델 소유자만 가능)",
+        "operationId": "createTrainingJob",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/jobs/{jobId}/start": {
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 작업 시작",
+        "description": "대기 중인 학습 작업을 시작하고 FastAPI 서버로 학습 요청을 전송합니다.",
+        "operationId": "startTraining",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "학습 작업 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/jobs/{jobId}/fail": {
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 실패 처리",
+        "description": "학습 작업을 실패 처리합니다. (FastAPI 서버 전용)",
+        "operationId": "failTraining",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "학습 작업 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/jobs/{jobId}/complete": {
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 완료 처리",
+        "description": "학습 작업을 완료 처리합니다. (FastAPI 서버 전용)",
+        "operationId": "completeTraining",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "학습 작업 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/models/{modelId}": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "모델의 태그 목록 조회",
+        "description": "특정 모델에 연결된 태그 목록을 조회합니다.",
+        "operationId": "getModelTags",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTagResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "모델에 태그 추가",
+        "description": "모델에 태그를 추가합니다. (모델 소유자만 가능)",
+        "operationId": "addTagToModel",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/advanced": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "고급 검색 (향후 구현)",
+        "description": "여러 조건을 조합하여 모델을 검색합니다. (키워드 + 태그 + 정렬 등)",
+        "operationId": "advancedSearch",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "공개 모델 목록 조회",
+        "description": "공개된 모델 목록을 최신순으로 조회합니다.",
+        "operationId": "getPublicModels",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "모델 생성",
+        "description": "새로운 LoRA 모델을 생성합니다.",
+        "operationId": "createModel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/samples": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "샘플 이미지 목록 조회",
+        "description": "모델의 샘플 이미지 목록을 조회합니다.",
+        "operationId": "getModelSamples",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListModelSampleResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "샘플 이미지 추가",
+        "description": "모델에 샘플 이미지를 추가합니다. (작성자만 가능)",
+        "operationId": "addSample",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SampleCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModelSampleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/prompts": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "프롬프트 목록 조회",
+        "description": "모델의 프롬프트 예시 목록을 조회합니다.",
+        "operationId": "getModelPrompts",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPromptResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "프롬프트 추가",
+        "description": "모델에 프롬프트 예시를 추가합니다. (작성자만 가능)",
+        "operationId": "addPrompt",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePromptResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/like": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "모델 좋아요 토글",
+        "description": "모델에 좋아요를 누르거나 취소합니다.",
+        "operationId": "toggleModelLike",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/favorite": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "모델 즐겨찾기 토글",
+        "description": "모델을 즐겨찾기에 추가하거나 제거합니다.",
+        "operationId": "toggleModelFavorite",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/comments": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "댓글 목록 조회",
+        "description": "모델의 댓글 목록을 조회합니다. (부모 댓글 + 대댓글)",
+        "operationId": "getComments",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseCommentResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "댓글 작성",
+        "description": "모델에 댓글을 작성합니다. parentCommentId가 있으면 대댓글이 됩니다.",
+        "operationId": "createComment",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCommentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/comments/{commentId}/like": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "댓글 좋아요 토글",
+        "description": "댓글에 좋아요를 누르거나 취소합니다.",
+        "operationId": "toggleCommentLike",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "description": "댓글 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "이미지 생성 요청",
+        "description": "LoRA 모델을 사용하여 이미지 생성을 요청합니다. FastAPI 서버와 통신하여 이미지를 생성하고, 생성된 이미지 URL을 받아 기록을 저장합니다.",
+        "operationId": "generateImage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/history": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "이미지 생성 기록 저장 (FastAPI 전용)",
+        "description": "FastAPI 서버에서 이미지 생성 완료 후 기록을 저장하기 위해 호출합니다.",
+        "operationId": "saveGenerationHistory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/history/{historyId}/sample": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "샘플로 등록",
+        "description": "생성 기록을 모델의 샘플 이미지로 등록합니다. (모델 소유자만 가능)",
+        "operationId": "markAsSample",
+        "parameters": [
+          {
+            "name": "historyId",
+            "in": "path",
+            "description": "생성 기록 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "샘플 등록 취소",
+        "description": "샘플 이미지 등록을 취소합니다. (모델 소유자만 가능)",
+        "operationId": "unmarkAsSample",
+        "parameters": [
+          {
+            "name": "historyId",
+            "in": "path",
+            "description": "생성 기록 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "액세스 토큰 갱신",
+        "description": "Refresh Token을 사용하여 새로운 Access Token을 발급받습니다.",
+        "operationId": "refreshAccessToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Refresh Token"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "로그아웃",
+        "description": "현재 Refresh Token을 삭제하여 로그아웃합니다.",
+        "operationId": "logout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Refresh Token"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout-all": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "모든 디바이스 로그아웃",
+        "description": "유저의 모든 Refresh Token을 삭제하여 모든 디바이스에서 로그아웃합니다.",
+        "operationId": "logoutAllDevices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "유저 프로필 조회",
+        "description": "특정 유저의 프로필 정보를 조회합니다.",
+        "operationId": "getUserProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "유저 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/search": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "유저 검색",
+        "description": "닉네임으로 유저를 검색합니다.",
+        "operationId": "searchUsers",
+        "parameters": [
+          {
+            "name": "nickname",
+            "in": "query",
+            "description": "검색할 닉네임",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/email/{email}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "이메일로 유저 조회",
+        "description": "이메일 주소로 유저를 조회합니다.",
+        "operationId": "getUserByEmail",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "description": "이메일 주소",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/stream": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 진행률 실시간 스트리밍 (SSE)",
+        "description": "FastAPI 서버의 학습 진행률을 Server-Sent Events로 실시간 스트리밍합니다. EventSource API를 사용하여 연결하세요.",
+        "operationId": "streamTrainingProgress",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServerSentEventMapStringObject"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/status/{status}": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "상태별 학습 작업 조회 (관리자)",
+        "description": "특정 상태의 학습 작업을 조회합니다. (관리자만 가능)",
+        "operationId": "getTrainingJobsByStatus",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "path",
+            "description": "학습 상태 (PENDING, IN_PROGRESS, COMPLETED, FAILED)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PREPROCESSING",
+                "TRAINING",
+                "SUCCESS",
+                "FAILED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/my": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "내 학습 작업 목록 조회",
+        "description": "현재 유저의 모든 학습 작업을 조회합니다.",
+        "operationId": "getMyTrainingJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/models/{modelId}/latest": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "모델의 최신 학습 작업 조회",
+        "description": "모델의 가장 최근 학습 작업을 조회합니다.",
+        "operationId": "getLatestTrainingJob",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "학습 작업 조회",
+        "description": "학습 작업의 상세 정보를 조회합니다.",
+        "operationId": "getTrainingJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "학습 작업 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/in-progress": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "진행 중인 학습 작업 조회 (관리자)",
+        "description": "현재 진행 중인 모든 학습 작업을 조회합니다. (관리자만 가능)",
+        "operationId": "getInProgressJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTrainingJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/training/fastapi/status": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "summary": "FastAPI 학습 상태 조회",
+        "description": "FastAPI 서버의 현재 학습 상태를 조회합니다.",
+        "operationId": "getFastApiTrainingStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "모든 태그 조회",
+        "description": "등록된 모든 태그를 조회합니다.",
+        "operationId": "getAllTags",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/{tagId}": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "태그 상세 조회",
+        "description": "특정 태그의 상세 정보를 조회합니다.",
+        "operationId": "getTag",
+        "parameters": [
+          {
+            "name": "tagId",
+            "in": "path",
+            "description": "태그 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/search": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "태그 검색",
+        "description": "태그 이름으로 검색합니다.",
+        "operationId": "searchTags",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "검색 키워드",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/popular": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "인기 태그 조회",
+        "description": "사용 횟수가 많은 상위 20개 태그를 조회합니다.",
+        "operationId": "getPopularTags",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/category/{category}": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "카테고리별 태그 조회",
+        "description": "특정 카테고리의 태그를 조회합니다.",
+        "operationId": "getTagsByCategory",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "description": "태그 카테고리 (CHARACTER, STYLE, THEME, OTHER)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "STYLE",
+                "CHARACTER",
+                "GENRE",
+                "OTHER"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "통합 검색",
+        "description": "키워드로 모델과 유저를 동시에 검색합니다.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "검색 키워드",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/users": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "유저 검색",
+        "description": "닉네임으로 유저를 검색합니다.",
+        "operationId": "searchUsers_1",
+        "parameters": [
+          {
+            "name": "nickname",
+            "in": "query",
+            "description": "검색할 닉네임",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/models": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "모델 검색",
+        "description": "키워드로 모델의 제목 또는 설명을 검색합니다.",
+        "operationId": "searchModels",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "검색 키워드",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/models/tags": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "태그로 모델 필터링",
+        "description": "지정한 태그를 가진 모델을 검색합니다.",
+        "operationId": "searchModelsByTags",
+        "parameters": [
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "태그 이름 목록 (쉼표로 구분)",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/models/recent": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "최신 모델 조회",
+        "description": "최근에 등록된 모델을 조회합니다.",
+        "operationId": "getRecentModels",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/models/popular": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "인기 모델 조회",
+        "description": "좋아요가 많은 순서로 모델을 조회합니다.",
+        "operationId": "getPopularModels",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "likeCount,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/like/status": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "모델 좋아요 여부 확인",
+        "description": "현재 유저가 모델에 좋아요를 눌렀는지 확인합니다.",
+        "operationId": "checkModelLike",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/user/{userId}": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "유저별 모델 목록 조회",
+        "description": "특정 유저가 작성한 모델 목록을 조회합니다.",
+        "operationId": "getUserModels",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "유저 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/search": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "모델 검색",
+        "description": "제목 또는 설명에서 키워드를 검색합니다.",
+        "operationId": "searchModels_1",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "검색 키워드",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/popular": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "인기 모델 목록 조회",
+        "description": "좋아요가 많은 순서로 모델 목록을 조회합니다.",
+        "operationId": "getPopularModels_1",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "likeCount,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/my": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "내 모델 목록 조회",
+        "description": "현재 유저가 작성한 모델 목록을 조회합니다.",
+        "operationId": "getMyModels",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/filter": {
+      "get": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "태그로 모델 필터링",
+        "description": "지정한 태그를 가진 모델을 조회합니다.",
+        "operationId": "filterModelsByTags",
+        "parameters": [
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "태그 이름 목록 (쉼표로 구분)",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/favorites": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "즐겨찾기 목록 조회",
+        "description": "현재 유저가 즐겨찾기한 모델 목록을 조회합니다.",
+        "operationId": "getFavoriteModels",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseLoraModelResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/stream": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "이미지 생성 진행률 실시간 스트리밍 (SSE)",
+        "description": "FastAPI 서버의 이미지 생성 진행률을 Server-Sent Events로 실시간 스트리밍합니다. EventSource API를 사용하여 연결하세요.",
+        "operationId": "streamGenerationProgress",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServerSentEventMapStringObject"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/history/{historyId}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "생성 기록 조회",
+        "description": "특정 생성 기록의 상세 정보를 조회합니다.",
+        "operationId": "getGenerationHistory",
+        "parameters": [
+          {
+            "name": "historyId",
+            "in": "path",
+            "description": "생성 기록 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "생성 기록 삭제",
+        "description": "생성 기록을 삭제합니다. (생성한 유저만 가능)",
+        "operationId": "deleteGenerationHistory",
+        "parameters": [
+          {
+            "name": "historyId",
+            "in": "path",
+            "description": "생성 기록 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/history/my": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "내 생성 기록 목록 조회",
+        "description": "현재 유저의 모든 생성 기록을 조회합니다.",
+        "operationId": "getMyGenerationHistory",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/history/my/models/{modelId}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "내 특정 모델 생성 기록 조회",
+        "description": "특정 모델로 내가 생성한 이미지 기록을 조회합니다.",
+        "operationId": "getMyModelGenerationHistory",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/history/models/{modelId}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "모델의 생성 기록 조회",
+        "description": "특정 모델로 생성된 이미지 기록을 조회합니다.",
+        "operationId": "getModelGenerationHistory",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Zero-based page index (0..N)",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "The size of the page to be returned",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "createdAt,DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseGenerationHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/fastapi/status": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "FastAPI 생성 상태 조회",
+        "description": "FastAPI 서버의 현재 이미지 생성 상태를 조회합니다.",
+        "operationId": "getFastApiGenerationStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generate/fastapi/images": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "생성된 이미지 URL 조회",
+        "description": "FastAPI 서버에서 생성된 이미지 URL 목록을 조회합니다.",
+        "operationId": "getGeneratedImages",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "현재 인증 정보 확인",
+        "description": "현재 로그인된 유저의 정보를 확인합니다.",
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "헬스 체크"
+        ],
+        "summary": "서버 상태 확인",
+        "description": "서버가 정상적으로 실행 중인지 확인합니다.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/models/{modelId}/tags/{tagId}": {
+      "delete": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "모델에서 태그 제거",
+        "description": "모델에서 태그를 제거합니다. (모델 소유자만 가능)",
+        "operationId": "removeTagFromModel",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "tagId",
+            "in": "path",
+            "description": "태그 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelId}/samples/{sampleId}": {
+      "delete": {
+        "tags": [
+          "LoRA Model"
+        ],
+        "summary": "샘플 이미지 삭제",
+        "description": "샘플 이미지를 삭제합니다. (작성자만 가능)",
+        "operationId": "deleteSample",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "description": "모델 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "sampleId",
+            "in": "path",
+            "description": "샘플 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "maxLength": 50,
+            "minLength": 2,
+            "type": "string",
+            "description": "닉네임",
+            "example": "새로운닉네임"
+          },
+          "profileImageUrl": {
+            "maxLength": 500,
+            "minLength": 0,
+            "type": "string",
+            "description": "프로필 이미지 URL",
+            "example": "https://example.com/profile.jpg"
+          }
+        },
+        "description": "유저 프로필 수정 요청"
+      },
+      "ApiResponseUserResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "유저 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "email": {
+            "type": "string",
+            "description": "이메일",
+            "example": "user@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "이름",
+            "example": "홍길동"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "닉네임",
+            "example": "길동이"
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "description": "프로필 이미지 URL",
+            "example": "https://example.com/profile.jpg"
+          },
+          "role": {
+            "type": "string",
+            "description": "역할",
+            "example": "USER"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "가입일",
+            "format": "date-time"
+          }
+        },
+        "description": "유저 정보 응답"
+      },
+      "ApiResponseTrainingJobResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/TrainingJobResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "TrainingJobResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "학습 작업 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userId": {
+            "type": "integer",
+            "description": "유저 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "example": "TRAINING"
+          },
+          "currentEpoch": {
+            "type": "integer",
+            "description": "현재 에포크",
+            "format": "int32",
+            "example": 50
+          },
+          "totalEpochs": {
+            "type": "integer",
+            "description": "전체 에포크 수",
+            "format": "int32",
+            "example": 250
+          },
+          "phase": {
+            "type": "string",
+            "description": "현재 단계",
+            "example": "Training phase"
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "에러 메시지",
+            "example": "null"
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "시작 시간",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "description": "완료 시간",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          }
+        },
+        "description": "학습 작업 응답"
+      },
+      "ApiResponseTagResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/TagResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "TagResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "태그 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "태그 이름",
+            "example": "애니메이션"
+          },
+          "category": {
+            "type": "string",
+            "description": "태그 카테고리",
+            "example": "STYLE"
+          },
+          "usageCount": {
+            "type": "integer",
+            "description": "사용 횟수",
+            "format": "int32",
+            "example": 150
+          }
+        },
+        "description": "태그 정보 응답"
+      },
+      "ModelUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string",
+            "description": "모델 제목",
+            "example": "소녀 전선 캐릭터 LoRA v2"
+          },
+          "description": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "모델 설명",
+            "example": "업데이트된 설명입니다."
+          },
+          "characterName": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "캐릭터 이름",
+            "example": "M4A1"
+          },
+          "style": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "스타일",
+            "example": "애니메이션, 일러스트"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "공개 여부",
+            "example": true
+          }
+        },
+        "description": "LoRA 모델 수정 요청"
+      },
+      "ApiResponseLoraModelResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoraModelResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "LoraModelResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userId": {
+            "type": "integer",
+            "description": "유저 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userNickname": {
+            "type": "string",
+            "description": "유저 닉네임",
+            "example": "길동이"
+          },
+          "title": {
+            "type": "string",
+            "description": "제목",
+            "example": "소녀 전선 캐릭터 LoRA"
+          },
+          "description": {
+            "type": "string",
+            "description": "설명",
+            "example": "소녀 전선 게임 캐릭터를 학습한 LoRA 모델입니다."
+          },
+          "characterName": {
+            "type": "string",
+            "description": "캐릭터 이름",
+            "example": "M4A1"
+          },
+          "style": {
+            "type": "string",
+            "description": "스타일",
+            "example": "애니메이션, 일러스트"
+          },
+          "trainingImagesCount": {
+            "type": "integer",
+            "description": "학습 이미지 수",
+            "format": "int32",
+            "example": 50
+          },
+          "baseModel": {
+            "type": "string",
+            "description": "베이스 모델",
+            "example": "stablediffusionapi/anything-v5"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "공개 여부",
+            "example": true
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "example": "COMPLETED"
+          },
+          "viewCount": {
+            "type": "integer",
+            "description": "조회수",
+            "format": "int32",
+            "example": 150
+          },
+          "likeCount": {
+            "type": "integer",
+            "description": "좋아요 수",
+            "format": "int32",
+            "example": 30
+          },
+          "favoriteCount": {
+            "type": "integer",
+            "description": "즐겨찾기 수",
+            "format": "int32",
+            "example": 20
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "수정일",
+            "format": "date-time"
+          }
+        },
+        "description": "LoRA 모델 응답 (목록용)"
+      },
+      "ApiResponseVoid": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "object",
+            "description": "응답 데이터"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PromptUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "프롬프트 제목",
+            "example": "수정된 프롬프트"
+          },
+          "prompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "프롬프트",
+            "example": "1girl, black hair, long hair, red eyes, anime style"
+          },
+          "negativePrompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres, bad anatomy, bad hands"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string",
+            "description": "프롬프트 설명",
+            "example": "수정된 설명입니다."
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "표시 순서",
+            "format": "int32",
+            "example": 1
+          }
+        },
+        "description": "프롬프트 예시 수정 요청"
+      },
+      "ApiResponsePromptResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PromptResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PromptResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "프롬프트 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "제목",
+            "example": "기본 프롬프트"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "프롬프트",
+            "example": "1girl, black hair, long hair, red eyes"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres, bad anatomy"
+          },
+          "description": {
+            "type": "string",
+            "description": "설명",
+            "example": "기본적인 캐릭터 생성 프롬프트입니다."
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "표시 순서",
+            "format": "int32",
+            "example": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          }
+        },
+        "description": "프롬프트 예시 응답"
+      },
+      "ApiResponseCommentResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/CommentResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "CommentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "댓글 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userId": {
+            "type": "integer",
+            "description": "작성자 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userNickname": {
+            "type": "string",
+            "description": "작성자 닉네임",
+            "example": "길동이"
+          },
+          "userProfileImageUrl": {
+            "type": "string",
+            "description": "작성자 프로필 이미지 URL",
+            "example": "https://example.com/profile.jpg"
+          },
+          "content": {
+            "type": "string",
+            "description": "댓글 내용",
+            "example": "정말 훌륭한 모델이네요!"
+          },
+          "likeCount": {
+            "type": "integer",
+            "description": "좋아요 수",
+            "format": "int32",
+            "example": 5
+          },
+          "isLiked": {
+            "type": "boolean",
+            "description": "현재 유저의 좋아요 여부",
+            "example": false
+          },
+          "isDeleted": {
+            "type": "boolean",
+            "description": "삭제 여부",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "수정일",
+            "format": "date-time"
+          }
+        },
+        "description": "댓글 응답"
+      },
+      "ApiResponseMapStringObject": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "description": "응답 데이터"
+            },
+            "description": "응답 데이터"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ApiResponsePageLoraModelResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageLoraModelResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PageLoraModelResponse": {
+        "type": "object",
+        "properties": {
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoraModelResponse"
+            }
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/SortObject"
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        },
+        "description": "응답 데이터"
+      },
+      "PageableObject": {
+        "type": "object",
+        "properties": {
+          "paged": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/SortObject"
+          },
+          "unpaged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SortObject": {
+        "type": "object",
+        "properties": {
+          "sorted": {
+            "type": "boolean"
+          },
+          "empty": {
+            "type": "boolean"
+          },
+          "unsorted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ModelCreateRequest": {
+        "required": [
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string",
+            "description": "모델 제목",
+            "example": "소녀 전선 캐릭터 LoRA"
+          },
+          "description": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "모델 설명",
+            "example": "소녀 전선 게임 캐릭터를 학습한 LoRA 모델입니다."
+          },
+          "characterName": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "캐릭터 이름",
+            "example": "M4A1"
+          },
+          "style": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "스타일",
+            "example": "애니메이션, 일러스트"
+          },
+          "trainingImagesCount": {
+            "type": "integer",
+            "description": "학습 이미지 수",
+            "format": "int32",
+            "example": 50
+          },
+          "epochs": {
+            "type": "integer",
+            "description": "학습 에포크 수",
+            "format": "int32",
+            "example": 250
+          },
+          "learningRate": {
+            "type": "number",
+            "description": "학습률",
+            "format": "double",
+            "example": 0.0001
+          },
+          "loraRank": {
+            "type": "integer",
+            "description": "LoRA Rank",
+            "format": "int32",
+            "example": 8
+          },
+          "baseModel": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string",
+            "description": "베이스 모델",
+            "example": "stablediffusionapi/anything-v5"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "공개 여부",
+            "example": false
+          }
+        },
+        "description": "LoRA 모델 생성 요청"
+      },
+      "SampleCreateRequest": {
+        "required": [
+          "imageUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "maxLength": 500,
+            "minLength": 0,
+            "type": "string",
+            "description": "이미지 URL",
+            "example": "https://example.com/sample.png"
+          },
+          "prompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "생성 프롬프트",
+            "example": "1girl, black hair, long hair, red eyes"
+          },
+          "negativePrompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres, bad anatomy"
+          },
+          "steps": {
+            "type": "integer",
+            "description": "생성 스텝 수",
+            "format": "int32",
+            "example": 40
+          },
+          "guidanceScale": {
+            "type": "number",
+            "description": "가이던스 스케일",
+            "format": "double",
+            "example": 7.5
+          },
+          "seed": {
+            "type": "integer",
+            "description": "시드 값",
+            "format": "int64",
+            "example": 123456
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "표시 순서",
+            "format": "int32",
+            "example": 0
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "대표 이미지 여부",
+            "example": false
+          }
+        },
+        "description": "모델 샘플 이미지 추가 요청"
+      },
+      "ApiResponseModelSampleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/ModelSampleResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ModelSampleResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "샘플 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "이미지 URL",
+            "example": "https://example.com/sample.png"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "생성 프롬프트",
+            "example": "1girl, black hair, long hair"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres"
+          },
+          "steps": {
+            "type": "integer",
+            "description": "생성 스텝 수",
+            "format": "int32",
+            "example": 40
+          },
+          "guidanceScale": {
+            "type": "number",
+            "description": "가이던스 스케일",
+            "example": 7.5
+          },
+          "seed": {
+            "type": "integer",
+            "description": "시드 값",
+            "format": "int64",
+            "example": 123456
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "표시 순서",
+            "format": "int32",
+            "example": 0
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "대표 이미지 여부",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          }
+        },
+        "description": "모델 샘플 이미지 응답"
+      },
+      "PromptCreateRequest": {
+        "required": [
+          "prompt",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "프롬프트 제목",
+            "example": "기본 프롬프트"
+          },
+          "prompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "프롬프트",
+            "example": "1girl, black hair, long hair, red eyes, anime style"
+          },
+          "negativePrompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres, bad anatomy, bad hands"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string",
+            "description": "프롬프트 설명",
+            "example": "기본적인 캐릭터 생성 프롬프트입니다."
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "표시 순서",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "description": "프롬프트 예시 생성 요청"
+      },
+      "ApiResponseMapStringBoolean": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean",
+              "description": "응답 데이터"
+            },
+            "description": "응답 데이터"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "CommentCreateRequest": {
+        "required": [
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "content": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "댓글 내용",
+            "example": "정말 훌륭한 모델이네요!"
+          }
+        },
+        "description": "댓글 작성 요청"
+      },
+      "GenerateImageRequest": {
+        "required": [
+          "modelId",
+          "prompt"
+        ],
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "integer",
+            "description": "LoRA 모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "prompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "생성 프롬프트",
+            "example": "1girl, black hair, long hair, red eyes, anime style"
+          },
+          "negativePrompt": {
+            "maxLength": 5000,
+            "minLength": 0,
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres, bad anatomy, bad hands"
+          },
+          "steps": {
+            "maximum": 150,
+            "minimum": 1,
+            "type": "integer",
+            "description": "생성 스텝 수",
+            "format": "int32",
+            "example": 40
+          },
+          "guidanceScale": {
+            "maximum": 20,
+            "minimum": 1,
+            "type": "number",
+            "description": "가이던스 스케일",
+            "format": "double",
+            "example": 7.5
+          },
+          "numImages": {
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer",
+            "description": "생성할 이미지 수",
+            "format": "int32",
+            "example": 1
+          },
+          "seed": {
+            "type": "integer",
+            "description": "시드 값 (재현성을 위해)",
+            "format": "int64",
+            "example": 123456
+          }
+        },
+        "description": "이미지 생성 요청"
+      },
+      "ApiResponseGenerationHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/GenerationHistoryResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "GenerationHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "생성 기록 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "modelTitle": {
+            "type": "string",
+            "description": "모델 제목",
+            "example": "소녀 전선 캐릭터 LoRA"
+          },
+          "userId": {
+            "type": "integer",
+            "description": "유저 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "prompt": {
+            "type": "string",
+            "description": "생성 프롬프트",
+            "example": "1girl, black hair, long hair, red eyes"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "네거티브 프롬프트",
+            "example": "nsfw, lowres, bad anatomy"
+          },
+          "steps": {
+            "type": "integer",
+            "description": "생성 스텝 수",
+            "format": "int32",
+            "example": 40
+          },
+          "guidanceScale": {
+            "type": "number",
+            "description": "가이던스 스케일",
+            "example": 7.5
+          },
+          "seed": {
+            "type": "integer",
+            "description": "시드 값",
+            "format": "int64",
+            "example": 123456
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "생성된 이미지 URL",
+            "example": "https://example.com/generated.png"
+          },
+          "isSample": {
+            "type": "boolean",
+            "description": "샘플로 등록 여부",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          }
+        },
+        "description": "이미지 생성 기록 응답"
+      },
+      "ApiResponseMapStringString": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "응답 데이터"
+            },
+            "description": "응답 데이터"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ApiResponsePageUserResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageUserResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PageUserResponse": {
+        "type": "object",
+        "properties": {
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserResponse"
+            }
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/SortObject"
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        },
+        "description": "응답 데이터"
+      },
+      "ServerSentEventMapStringObject": {
+        "type": "object"
+      },
+      "ApiResponseListTrainingJobResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "array",
+            "description": "응답 데이터",
+            "items": {
+              "$ref": "#/components/schemas/TrainingJobResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ApiResponseListTagResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "array",
+            "description": "응답 데이터",
+            "items": {
+              "$ref": "#/components/schemas/TagResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ApiResponseLoraModelDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoraModelDetailResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "LoraModelDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "모델 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userId": {
+            "type": "integer",
+            "description": "유저 ID",
+            "format": "int64",
+            "example": 1
+          },
+          "userNickname": {
+            "type": "string",
+            "description": "유저 닉네임",
+            "example": "길동이"
+          },
+          "title": {
+            "type": "string",
+            "description": "제목",
+            "example": "소녀 전선 캐릭터 LoRA"
+          },
+          "description": {
+            "type": "string",
+            "description": "설명",
+            "example": "소녀 전선 게임 캐릭터를 학습한 LoRA 모델입니다."
+          },
+          "characterName": {
+            "type": "string",
+            "description": "캐릭터 이름",
+            "example": "M4A1"
+          },
+          "style": {
+            "type": "string",
+            "description": "스타일",
+            "example": "애니메이션, 일러스트"
+          },
+          "trainingImagesCount": {
+            "type": "integer",
+            "description": "학습 이미지 수",
+            "format": "int32",
+            "example": 50
+          },
+          "epochs": {
+            "type": "integer",
+            "description": "에포크 수",
+            "format": "int32",
+            "example": 250
+          },
+          "learningRate": {
+            "type": "number",
+            "description": "학습률",
+            "example": 0.0001
+          },
+          "loraRank": {
+            "type": "integer",
+            "description": "LoRA Rank",
+            "format": "int32",
+            "example": 8
+          },
+          "modelPath": {
+            "type": "string",
+            "description": "모델 경로",
+            "example": "/models/lora_model_1"
+          },
+          "baseModel": {
+            "type": "string",
+            "description": "베이스 모델",
+            "example": "stablediffusionapi/anything-v5"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "공개 여부",
+            "example": true
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "example": "COMPLETED"
+          },
+          "viewCount": {
+            "type": "integer",
+            "description": "조회수",
+            "format": "int32",
+            "example": 150
+          },
+          "likeCount": {
+            "type": "integer",
+            "description": "좋아요 수",
+            "format": "int32",
+            "example": 30
+          },
+          "favoriteCount": {
+            "type": "integer",
+            "description": "즐겨찾기 수",
+            "format": "int32",
+            "example": 20
+          },
+          "samples": {
+            "type": "array",
+            "description": "샘플 이미지 목록",
+            "items": {
+              "$ref": "#/components/schemas/ModelSampleResponse"
+            }
+          },
+          "prompts": {
+            "type": "array",
+            "description": "프롬프트 예시 목록",
+            "items": {
+              "$ref": "#/components/schemas/PromptResponse"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "description": "태그 목록",
+            "items": {
+              "$ref": "#/components/schemas/TagResponse"
+            }
+          },
+          "isLiked": {
+            "type": "boolean",
+            "description": "현재 유저의 좋아요 여부",
+            "example": true
+          },
+          "isFavorited": {
+            "type": "boolean",
+            "description": "현재 유저의 즐겨찾기 여부",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "생성일",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "수정일",
+            "format": "date-time"
+          }
+        },
+        "description": "LoRA 모델 상세 응답"
+      },
+      "ApiResponseListModelSampleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "array",
+            "description": "응답 데이터",
+            "items": {
+              "$ref": "#/components/schemas/ModelSampleResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ApiResponseListPromptResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "type": "array",
+            "description": "응답 데이터",
+            "items": {
+              "$ref": "#/components/schemas/PromptResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "ApiResponsePageResponseCommentResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseCommentResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PageResponseCommentResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "데이터 목록",
+            "items": {
+              "$ref": "#/components/schemas/CommentResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "description": "현재 페이지 번호 (0부터 시작)",
+            "format": "int32",
+            "example": 0
+          },
+          "size": {
+            "type": "integer",
+            "description": "페이지 크기",
+            "format": "int32",
+            "example": 20
+          },
+          "totalElements": {
+            "type": "integer",
+            "description": "전체 데이터 개수",
+            "format": "int64",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "전체 페이지 수",
+            "format": "int32",
+            "example": 5
+          },
+          "first": {
+            "type": "boolean",
+            "description": "첫 페이지 여부",
+            "example": true
+          },
+          "last": {
+            "type": "boolean",
+            "description": "마지막 페이지 여부",
+            "example": false
+          },
+          "empty": {
+            "type": "boolean",
+            "description": "비어있는 페이지 여부",
+            "example": false
+          }
+        },
+        "description": "페이징 응답"
+      },
+      "ApiResponsePageResponseLoraModelResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseLoraModelResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PageResponseLoraModelResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "데이터 목록",
+            "items": {
+              "$ref": "#/components/schemas/LoraModelResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "description": "현재 페이지 번호 (0부터 시작)",
+            "format": "int32",
+            "example": 0
+          },
+          "size": {
+            "type": "integer",
+            "description": "페이지 크기",
+            "format": "int32",
+            "example": 20
+          },
+          "totalElements": {
+            "type": "integer",
+            "description": "전체 데이터 개수",
+            "format": "int64",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "전체 페이지 수",
+            "format": "int32",
+            "example": 5
+          },
+          "first": {
+            "type": "boolean",
+            "description": "첫 페이지 여부",
+            "example": true
+          },
+          "last": {
+            "type": "boolean",
+            "description": "마지막 페이지 여부",
+            "example": false
+          },
+          "empty": {
+            "type": "boolean",
+            "description": "비어있는 페이지 여부",
+            "example": false
+          }
+        },
+        "description": "페이징 응답"
+      },
+      "ApiResponsePageResponseGenerationHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "응답 메시지",
+            "example": "요청이 성공적으로 처리되었습니다."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseGenerationHistoryResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "응답 시간",
+            "format": "date-time"
+          }
+        },
+        "description": "공통 API 응답"
+      },
+      "PageResponseGenerationHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "데이터 목록",
+            "items": {
+              "$ref": "#/components/schemas/GenerationHistoryResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "description": "현재 페이지 번호 (0부터 시작)",
+            "format": "int32",
+            "example": 0
+          },
+          "size": {
+            "type": "integer",
+            "description": "페이지 크기",
+            "format": "int32",
+            "example": 20
+          },
+          "totalElements": {
+            "type": "integer",
+            "description": "전체 데이터 개수",
+            "format": "int64",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "전체 페이지 수",
+            "format": "int32",
+            "example": 5
+          },
+          "first": {
+            "type": "boolean",
+            "description": "첫 페이지 여부",
+            "example": true
+          },
+          "last": {
+            "type": "boolean",
+            "description": "마지막 페이지 여부",
+            "example": false
+          },
+          "empty": {
+            "type": "boolean",
+            "description": "비어있는 페이지 여부",
+            "example": false
+          }
+        },
+        "description": "페이징 응답"
+      }
+    },
+    "securitySchemes": {
+      "JWT Authentication": {
+        "type": "http",
+        "description": "JWT 토큰을 입력하세요. (Bearer 제외)",
+        "name": "JWT Authentication",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

@@ -1,0 +1,492 @@
+const API_BASE_URL = 'http://localhost:8080';
+
+// ========== Types ==========
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+  timestamp: string;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
+
+export interface LoraModel {
+  id: number;
+  userId: number;
+  userNickname: string;
+  title: string;
+  description: string;
+  characterName?: string;
+  style?: string;
+  trainingImagesCount: number;
+  baseModel: string;
+  isPublic: boolean;
+  status: string;
+  viewCount: number;
+  likeCount: number;
+  favoriteCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModelDetailResponse extends LoraModel {
+  samples: ModelSample[];
+  prompts: PromptResponse[];
+  tags: TagResponse[];
+}
+
+export interface ModelSample {
+  id: number;
+  imageUrl: string;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
+export interface PromptResponse {
+  id: number;
+  modelId: number;
+  title: string;
+  prompt: string;
+  negativePrompt: string;
+  description: string;
+  displayOrder: number;
+  createdAt: string;
+}
+
+export interface TagResponse {
+  id: number;
+  name: string;
+  category: string;
+  usageCount: number;
+}
+
+export interface UserResponse {
+  id: number;
+  email: string;
+  name: string;
+  nickname: string;
+  profileImageUrl: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface CommentResponse {
+  id: number;
+  modelId: number;
+  userId: number;
+  userNickname: string;
+  userProfileImageUrl: string;
+  content: string;
+  likeCount: number;
+  createdAt: string;
+  replies?: CommentResponse[];
+}
+
+export interface TrainingJobResponse {
+  id: number;
+  modelId: number;
+  userId: number;
+  status: string;
+  currentEpoch: number;
+  totalEpochs: number;
+  phase: string;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+}
+
+// ========== Auth Helper ==========
+const getAuthHeaders = (): HeadersInit => {
+  const token = localStorage.getItem('accessToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+};
+
+const handleResponse = async <T>(response: Response): Promise<T> => {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || `HTTP Error: ${response.status}`);
+  }
+  return response.json();
+};
+
+// ========== API Methods ==========
+export const api = {
+  // ========== Auth ==========
+  auth: {
+    async googleLogin(): Promise<void> {
+      window.location.href = `${API_BASE_URL}/api/auth/google`;
+    },
+
+    async getCurrentUser(): Promise<ApiResponse<Record<string, unknown>>> {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async refreshToken(refreshToken: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      return handleResponse(response);
+    },
+
+    async logout(refreshToken: string): Promise<ApiResponse<void>> {
+      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ refreshToken }),
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // ========== Models ==========
+  models: {
+    async getPublicModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models?page=${page}&size=${size}&sort=createdAt,DESC`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async getPopularModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/popular?page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async getModelDetail(modelId: number): Promise<ApiResponse<ModelDetailResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async getMyModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/my?page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async createModel(data: {
+      title: string;
+      description: string;
+      characterName?: string;
+      style?: string;
+      isPublic: boolean;
+    }): Promise<ApiResponse<LoraModel>> {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async updateModel(
+      modelId: number,
+      data: Partial<{
+        title: string;
+        description: string;
+        characterName: string;
+        style: string;
+        isPublic: boolean;
+      }>
+    ): Promise<ApiResponse<LoraModel>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async deleteModel(modelId: number): Promise<ApiResponse<void>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async filterByTags(tags: string[], page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const tagParams = tags.map(tag => `tags=${encodeURIComponent(tag)}`).join('&');
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/filter?${tagParams}&page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+  },
+
+  // ========== Community ==========
+  community: {
+    async toggleLike(modelId: number): Promise<ApiResponse<{ liked: boolean }>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/like`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async toggleFavorite(modelId: number): Promise<ApiResponse<{ favorited: boolean }>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/favorite`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async getComments(modelId: number, page = 0, size = 20): Promise<ApiResponse<PageResponse<CommentResponse>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/${modelId}/comments?page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async createComment(modelId: number, content: string, parentCommentId?: number): Promise<ApiResponse<CommentResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content, parentCommentId }),
+      });
+      return handleResponse(response);
+    },
+
+    async getFavoriteModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/favorites?page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+  },
+
+  // ========== Tags ==========
+  tags: {
+    async getAllTags(): Promise<ApiResponse<TagResponse[]>> {
+      const response = await fetch(`${API_BASE_URL}/api/tags`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async getPopularTags(): Promise<ApiResponse<TagResponse[]>> {
+      const response = await fetch(`${API_BASE_URL}/api/tags/popular`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async searchTags(keyword: string): Promise<ApiResponse<TagResponse[]>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/tags/search?keyword=${encodeURIComponent(keyword)}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+  },
+
+  // ========== User ==========
+  user: {
+    async getMyProfile(): Promise<ApiResponse<UserResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async updateMyProfile(data: { nickname?: string; profileImageUrl?: string }): Promise<ApiResponse<UserResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async getUserProfile(userId: number): Promise<ApiResponse<UserResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // ========== Training ==========
+  training: {
+    async createModel(data: {
+      title: string;
+      description?: string;
+      characterName?: string;
+      style?: string;
+      trainingImagesCount?: number;
+      epochs?: number;
+      learningRate?: number;
+      loraRank?: number;
+      baseModel?: string;
+      isPublic?: boolean;
+    }): Promise<ApiResponse<LoraModel>> {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async createTrainingJob(modelId: number): Promise<ApiResponse<TrainingJobResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/training/models/${modelId}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async startTraining(jobId: number, config: Record<string, unknown>): Promise<ApiResponse<Record<string, unknown>>> {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(config),
+      });
+      return handleResponse(response);
+    },
+
+    async getTrainingJob(jobId: number): Promise<ApiResponse<TrainingJobResponse>> {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async getMyTrainingJobs(): Promise<ApiResponse<TrainingJobResponse[]>> {
+      const response = await fetch(`${API_BASE_URL}/api/training/my`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async deleteTrainingJob(jobId: number): Promise<ApiResponse<void>> {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ error: 'User cancelled' }),
+      });
+      return handleResponse(response);
+    },
+
+    streamTrainingProgress(onMessage: (data: Record<string, unknown>) => void): EventSource {
+      const eventSource = new EventSource(`${API_BASE_URL}/api/training/stream`);
+      eventSource.onmessage = (event) => {
+        onMessage(JSON.parse(event.data));
+      };
+      return eventSource;
+    },
+  },
+
+  // ========== Generation ==========
+  generation: {
+    async generateImage(data: {
+      modelId: number;
+      prompt: string;
+      negativePrompt?: string;
+      steps?: number;
+      guidanceScale?: number;
+      seed?: number;
+    }): Promise<ApiResponse<Record<string, unknown>>> {
+      const response = await fetch(`${API_BASE_URL}/api/generate`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async getMyGenerationHistory(page = 0, size = 20): Promise<ApiResponse<PageResponse<unknown>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/generate/history/my?page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    streamGenerationProgress(onMessage: (data: Record<string, unknown>) => void): EventSource {
+      const eventSource = new EventSource(`${API_BASE_URL}/api/generate/stream`);
+      eventSource.onmessage = (event) => {
+        onMessage(JSON.parse(event.data));
+      };
+      return eventSource;
+    },
+  },
+
+  // ========== Search ==========
+  search: {
+    async search(query: string, page = 0, size = 20): Promise<ApiResponse<Record<string, unknown>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/search/models?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+  },
+};
+
+// ========== Auth Store ==========
+export const authStore = {
+  setTokens(accessToken: string, refreshToken: string): void {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+  },
+
+  getAccessToken(): string | null {
+    return localStorage.getItem('accessToken');
+  },
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem('refreshToken');
+  },
+
+  clearTokens(): void {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  },
+
+  isAuthenticated(): boolean {
+    return !!this.getAccessToken();
+  },
+};
