@@ -220,6 +220,8 @@ const clearSearch = () => {
             :likeCount="model.likeCount"
             :viewCount="model.viewCount"
             :favoriteCount="model.favoriteCount"
+            :isLiked="model.isLiked"
+            :thumbnailUrl="model.thumbnailUrl"
           />
         </router-link>
       </div>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import ModelCard from '../components/ModelCard.vue';
 import { api, authStore, type UserResponse, type LoraModel } from '../services/api';
 
 const router = useRouter();
+const route = useRoute();
 
 const user = ref<UserResponse | null>(null);
 const isEditing = ref(false);
@@ -13,10 +14,18 @@ const editForm = ref({
   profileImageUrl: '',
 });
 
-const activeTab = ref<'models' | 'favorites' | 'history'>('models');
+// Set initial tab based on route
+const getInitialTab = () => {
+  if (route.path === '/my-models') return 'models';
+  if (route.path === '/favorites') return 'favorites';
+  return 'models'; // default to models for /profile
+};
+
+const activeTab = ref<'models' | 'favorites' | 'history'>(getInitialTab());
 const loading = ref(true);
 const myModels = ref<LoraModel[]>([]);
 const favoriteModels = ref<LoraModel[]>([]);
+const likedModels = ref<LoraModel[]>([]);
 const generationHistory = ref<any[]>([]);
 
 onMounted(async () => {
@@ -29,6 +38,7 @@ onMounted(async () => {
   await loadUserProfile();
   await loadMyModels();
   await loadFavoriteModels();
+  await loadLikedModels();
   await loadGenerationHistory();
 });
 
@@ -63,6 +73,15 @@ const loadFavoriteModels = async () => {
     favoriteModels.value = response.data.content;
   } catch (error) {
     console.error('Failed to load favorite models:', error);
+  }
+};
+
+const loadLikedModels = async () => {
+  try {
+    const response = await api.community.getLikedModels(0, 20);
+    likedModels.value = response.data.content;
+  } catch (error) {
+    console.error('Failed to load liked models:', error);
   } finally {
     loading.value = false;
   }
@@ -146,7 +165,7 @@ const saveProfile = async () => {
                   <span class="stat-label">Models</span>
                 </div>
                 <div class="stat-item">
-                  <span class="stat-value">{{ favoriteModels.length }}</span>
+                  <span class="stat-value">{{ likedModels.length + favoriteModels.length }}</span>
                   <span class="stat-label">Favorites</span>
                 </div>
               </div>
@@ -232,26 +251,55 @@ const saveProfile = async () => {
 
         <!-- Favorites Tab -->
         <div v-if="activeTab === 'favorites'">
-          <div v-if="favoriteModels.length" class="grid grid-cols-4 gap-lg">
-            <a
-              v-for="model in favoriteModels"
-              :key="model.id"
-              :href="`/models/${model.id}`"
-              style="text-decoration: none; color: inherit;"
-            >
-              <ModelCard
-                :id="model.id"
-                :title="model.title"
-                :description="model.description"
-                :userNickname="model.userNickname"
-                :likeCount="model.likeCount"
-                :viewCount="model.viewCount"
-                :favoriteCount="model.favoriteCount"
-              />
-            </a>
+          <!-- Liked Models Section -->
+          <div v-if="likedModels.length > 0" class="mb-xl">
+            <h2 class="text-2xl font-bold mb-lg">좋아요한 모델</h2>
+            <div class="grid grid-cols-4 gap-lg">
+              <a
+                v-for="model in likedModels"
+                :key="model.id"
+                :href="`/models/${model.id}`"
+                style="text-decoration: none; color: inherit;"
+              >
+                <ModelCard
+                  :id="model.id"
+                  :title="model.title"
+                  :description="model.description"
+                  :userNickname="model.userNickname"
+                  :likeCount="model.likeCount"
+                  :viewCount="model.viewCount"
+                  :favoriteCount="model.favoriteCount"
+                />
+              </a>
+            </div>
           </div>
-          <div v-else class="card text-center p-xl">
-            <p class="text-secondary text-lg">No favorite models yet</p>
+
+          <!-- Favorited Models Section -->
+          <div v-if="favoriteModels.length > 0">
+            <h2 class="text-2xl font-bold mb-lg">즐겨찾기한 모델</h2>
+            <div class="grid grid-cols-4 gap-lg">
+              <a
+                v-for="model in favoriteModels"
+                :key="model.id"
+                :href="`/models/${model.id}`"
+                style="text-decoration: none; color: inherit;"
+              >
+                <ModelCard
+                  :id="model.id"
+                  :title="model.title"
+                  :description="model.description"
+                  :userNickname="model.userNickname"
+                  :likeCount="model.likeCount"
+                  :viewCount="model.viewCount"
+                  :favoriteCount="model.favoriteCount"
+                />
+              </a>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="likedModels.length === 0 && favoriteModels.length === 0" class="card text-center p-xl">
+            <p class="text-secondary text-lg">좋아요하거나 즐겨찾기한 모델이 없습니다</p>
           </div>
         </div>
 

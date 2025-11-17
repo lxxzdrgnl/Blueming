@@ -17,9 +17,7 @@ const model = ref({
   userId: 1,
   likeCount: 245,
   viewCount: 1250,
-  favoriteCount: 89,
   isLiked: false,
-  isFavorited: false,
   samples: [
     { id: 1, imageUrl: 'https://via.placeholder.com/400x500' },
     { id: 2, imageUrl: 'https://via.placeholder.com/400x500' },
@@ -67,8 +65,7 @@ const fetchModelDetails = async () => {
 
     model.value = {
       ...response.data,
-      isLiked: false, // TODO: Check if user liked
-      isFavorited: false, // TODO: Check if user favorited
+      isLiked: response.data.isLiked || false,
       samples: response.data.samples || [],
       prompts: response.data.prompts || [],
       tags: response.data.tags || [],
@@ -100,15 +97,6 @@ const toggleLike = async () => {
   }
 };
 
-const toggleFavorite = async () => {
-  try {
-    await api.community.toggleFavorite(modelId.value);
-    model.value.isFavorited = !model.value.isFavorited;
-    model.value.favoriteCount += model.value.isFavorited ? 1 : -1;
-  } catch (err) {
-    console.error('Failed to toggle favorite:', err);
-  }
-};
 
 const submitComment = async () => {
   if (!newComment.value.trim()) return;
@@ -119,6 +107,20 @@ const submitComment = async () => {
     newComment.value = '';
   } catch (err) {
     console.error('Failed to create comment:', err);
+  }
+};
+
+const toggleCommentLike = async (commentId: number) => {
+  try {
+    const response = await api.community.toggleCommentLike(modelId.value, commentId);
+    // Update the comment in local state
+    const comment = comments.value.find(c => c.id === commentId);
+    if (comment) {
+      comment.isLiked = response.data.isLiked;
+      comment.likeCount += response.data.isLiked ? 1 : -1;
+    }
+  } catch (err) {
+    console.error('Failed to toggle comment like:', err);
   }
 };
 
@@ -160,15 +162,11 @@ const goToGenerate = () => {
 
         <!-- Actions -->
         <div class="flex gap-sm">
-          <button class="btn btn-secondary btn-icon" @click="toggleLike">
+          <button class="btn btn-secondary btn-icon" @click="toggleLike" :class="{ 'btn-primary': model.isLiked }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" :fill="model.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
-          </button>
-          <button class="btn btn-secondary btn-icon" @click="toggleFavorite">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" :fill="model.isFavorited ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-            </svg>
+            {{ model.likeCount }}
           </button>
           <button class="btn btn-primary" @click="goToGenerate">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -184,16 +182,12 @@ const goToGenerate = () => {
       <!-- Stats -->
       <div class="stats-bar card-sm flex items-center gap-xl mt-lg">
         <div class="stat-item">
-          <span class="text-2xl font-bold">{{ model.likeCount }}</span>
-          <span class="text-sm text-secondary">Likes</span>
-        </div>
-        <div class="stat-item">
           <span class="text-2xl font-bold">{{ model.viewCount }}</span>
           <span class="text-sm text-secondary">Views</span>
         </div>
         <div class="stat-item">
-          <span class="text-2xl font-bold">{{ model.favoriteCount }}</span>
-          <span class="text-sm text-secondary">Favorites</span>
+          <span class="text-2xl font-bold">{{ model.likeCount }}</span>
+          <span class="text-sm text-secondary">Likes</span>
         </div>
       </div>
     </div>
@@ -270,8 +264,12 @@ const goToGenerate = () => {
                 <span class="text-xs text-muted">{{ new Date(comment.createdAt).toLocaleDateString() }}</span>
               </div>
               <p class="text-secondary mb-sm">{{ comment.content }}</p>
-              <button class="btn btn-ghost btn-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <button
+                class="btn btn-ghost btn-sm"
+                :class="{ 'text-error': comment.isLiked }"
+                @click="toggleCommentLike(comment.id)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" :fill="comment.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </svg>
                 {{ comment.likeCount }}

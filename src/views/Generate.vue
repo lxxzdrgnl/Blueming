@@ -14,6 +14,7 @@ const selectedModel = ref<LoraModel | null>(null);
 const showModelModal = ref(false);
 const activeTab = ref<'my' | 'community'>('my');
 const searchQuery = ref('');
+const showOnlyLiked = ref(false);
 const isLoadingModels = ref(false);
 const loadError = ref('');
 
@@ -84,10 +85,15 @@ const loadModels = async () => {
 
     // 커뮤니티 모델 로드
     try {
-      const communityResponse = await api.models.getPublicModels(0, 100);
-      communityModels.value = communityResponse.data.content;
-      console.log('✅ Community models loaded:', communityModels.value.length);
-      console.log('Community models sample:', communityModels.value.slice(0, 2));
+      if (showOnlyLiked.value) {
+        const likedResponse = await api.community.getLikedModels(0, 100);
+        communityModels.value = likedResponse.data.content;
+        console.log('✅ Liked models loaded:', communityModels.value.length);
+      } else {
+        const communityResponse = await api.models.getPublicModels(0, 100);
+        communityModels.value = communityResponse.data.content;
+        console.log('✅ Community models loaded:', communityModels.value.length);
+      }
     } catch (commErr) {
       console.error('❌ Failed to load community models:', commErr);
       communityModels.value = [];
@@ -99,6 +105,11 @@ const loadModels = async () => {
   } finally {
     isLoadingModels.value = false;
   }
+};
+
+const toggleLikedFilter = async () => {
+  showOnlyLiked.value = !showOnlyLiked.value;
+  await loadModels();
 };
 
 const openModelModal = () => {
@@ -450,6 +461,20 @@ onUnmounted(() => {
           </button>
         </div>
 
+        <!-- Liked Filter (for Community tab only) -->
+        <div v-if="activeTab === 'community'" class="flex gap-sm mb-md px-lg">
+          <button
+            class="btn btn-sm"
+            :class="showOnlyLiked ? 'btn-primary' : 'btn-secondary'"
+            @click="toggleLikedFilter"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" :fill="showOnlyLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+            {{ showOnlyLiked ? '좋아요한 모델만 보기' : '전체 모델 보기' }}
+          </button>
+        </div>
+
         <!-- Loading State -->
         <div v-if="isLoadingModels" class="modal-body">
           <div class="loading-state text-center py-xl">
@@ -485,16 +510,31 @@ onUnmounted(() => {
             <div
               v-for="model in filteredMyModels"
               :key="model.id"
-              class="model-card"
+              class="card model-item"
               @click="selectModel(model)"
             >
-              <div class="model-info">
-                <h4 class="font-semibold">{{ model.title }}</h4>
-                <p class="text-sm text-secondary mt-xs">{{ model.description || 'No description' }}</p>
-                <div class="flex gap-sm mt-sm text-xs text-muted">
-                  <span>👁️ {{ model.viewCount || 0 }}</span>
-                  <span>❤️ {{ model.likeCount || 0 }}</span>
-                  <span>⭐ {{ model.favoriteCount || 0 }}</span>
+              <div class="flex items-center gap-md">
+                <div v-if="model.thumbnailUrl" class="model-thumb">
+                  <img :src="model.thumbnailUrl" :alt="model.title" class="img-cover" />
+                </div>
+                <div class="flex-1">
+                  <h4 class="font-semibold mb-xs">{{ model.title }}</h4>
+                  <p class="text-sm text-secondary mb-sm">{{ model.description || 'No description' }}</p>
+                  <div class="flex items-center gap-md text-xs text-muted">
+                    <span class="flex items-center gap-xs">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      {{ model.viewCount || 0 }}
+                    </span>
+                    <span class="flex items-center gap-xs">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                      </svg>
+                      {{ model.likeCount || 0 }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -509,17 +549,32 @@ onUnmounted(() => {
             <div
               v-for="model in filteredCommunityModels"
               :key="model.id"
-              class="model-card"
+              class="card model-item"
               @click="selectModel(model)"
             >
-              <div class="model-info">
-                <h4 class="font-semibold">{{ model.title }}</h4>
-                <p class="text-sm text-secondary mt-xs">by {{ model.userNickname }}</p>
-                <p class="text-sm text-secondary mt-xs">{{ model.description || 'No description' }}</p>
-                <div class="flex gap-sm mt-sm text-xs text-muted">
-                  <span>👁️ {{ model.viewCount || 0 }}</span>
-                  <span>❤️ {{ model.likeCount || 0 }}</span>
-                  <span>⭐ {{ model.favoriteCount || 0 }}</span>
+              <div class="flex items-center gap-md">
+                <div v-if="model.thumbnailUrl" class="model-thumb">
+                  <img :src="model.thumbnailUrl" :alt="model.title" class="img-cover" />
+                </div>
+                <div class="flex-1">
+                  <h4 class="font-semibold mb-xs">{{ model.title }}</h4>
+                  <p class="text-sm text-secondary mb-xs">by {{ model.userNickname }}</p>
+                  <p class="text-sm text-secondary mb-sm">{{ model.description || 'No description' }}</p>
+                  <div class="flex items-center gap-md text-xs text-muted">
+                    <span class="flex items-center gap-xs">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      {{ model.viewCount || 0 }}
+                    </span>
+                    <span class="flex items-center gap-xs">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                      </svg>
+                      {{ model.likeCount || 0 }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -659,24 +714,27 @@ onUnmounted(() => {
   gap: var(--space-md);
 }
 
-.model-card {
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
+.model-item {
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
-.model-card:hover {
+.model-item:hover {
   border-color: var(--text-primary);
-  transform: translateX(4px);
   box-shadow: var(--shadow-md);
 }
 
-.model-info {
-  display: flex;
-  flex-direction: column;
+.model-thumb {
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-hover);
+}
+
+.flex-1 {
+  flex: 1;
 }
 
 .progress-bar {
@@ -717,6 +775,10 @@ onUnmounted(() => {
 
 .ml-sm {
   margin-left: var(--space-sm);
+}
+
+.gap-xs {
+  gap: var(--space-xs);
 }
 
 @media (max-width: 1024px) {

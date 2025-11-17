@@ -7,6 +7,7 @@ interface Props {
   likeCount: number;
   viewCount: number;
   favoriteCount: number;
+  isLiked?: boolean;
   thumbnailUrl?: string;
   tags?: Array<{ id: number; name: string }>;
 }
@@ -25,8 +26,8 @@ defineProps<Props>();
       />
       <div class="model-overlay">
         <div class="flex gap-sm">
-          <span class="stat">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <span class="stat" :class="{ 'stat-liked': isLiked }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" :stroke-width="isLiked ? '0' : '2'">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
             {{ likeCount }}
@@ -84,6 +85,9 @@ defineProps<Props>();
 }
 
 .model-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   transition: transform 0.3s ease;
 }
 
@@ -111,6 +115,10 @@ defineProps<Props>();
   font-size: 12px;
   font-weight: 500;
   backdrop-filter: blur(4px);
+}
+
+.stat-liked {
+  color: #ff4757;
 }
 
 .model-content {

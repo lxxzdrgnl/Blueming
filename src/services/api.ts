@@ -93,6 +93,7 @@ export interface CommentResponse {
   userProfileImageUrl: string;
   content: string;
   likeCount: number;
+  isLiked: boolean;
   createdAt: string;
   replies?: CommentResponse[];
 }
@@ -299,6 +300,14 @@ export const api = {
       return handleResponse(response);
     },
 
+    async toggleCommentLike(modelId: number, commentId: number): Promise<ApiResponse<{ isLiked: boolean }>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}/like`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
     async getComments(modelId: number, page = 0, size = 20): Promise<ApiResponse<PageResponse<CommentResponse>>> {
       const response = await fetch(
         `${API_BASE_URL}/api/models/${modelId}/comments?page=${page}&size=${size}`,
@@ -319,6 +328,14 @@ export const api = {
     async getFavoriteModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
         `${API_BASE_URL}/api/models/favorites?page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async getLikedModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/likes?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
