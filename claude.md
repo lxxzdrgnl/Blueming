@@ -266,6 +266,43 @@ api.community.createComment(modelId, content, parentCommentId?)
    - SSE 실시간 진행률
    - 트레이닝 히스토리
 
+### Phase 5: Google OAuth 통합 및 UI 개선 ✅
+1. **Google OAuth 로그인 통합**
+   - AuthCallback.vue 생성: OAuth2 콜백 처리, URL Fragment에서 토큰 추출
+   - api.ts에 `googleLogin()` 메서드 추가
+   - Login.vue에서 백엔드 OAuth 엔드포인트 호출
+   - 로그인 후 자동으로 홈(/)으로 리다이렉트 (페이지 새로고침)
+
+2. **Navigation 컴포넌트 개선**
+   - 로그인 상태에 따라 "Login with Google" 버튼 또는 사용자 프로필 표시
+   - 사용자 아바타 + 닉네임 표시
+   - 드롭다운 메뉴: Profile, My Models, Favorites, Logout
+   - 모바일 햄버거 메뉴 추가
+   - 모바일에서 Search 탭 제거, 닉네임 텍스트 숨김 (아바타만 표시)
+
+3. **프로필 자동 갱신**
+   - Profile.vue: 프로필 수정 시 CustomEvent (`profile-updated`) 발생
+   - Navigation.vue: `profile-updated` 이벤트 수신하여 실시간 닉네임/아바타 갱신
+   - 새로고침 없이 Navigation 바 자동 업데이트
+
+4. **Search 기능 통합**
+   - Search 탭 제거, Explore 페이지에 검색 기능 통합
+   - ModelList.vue에 검색창 추가 (Hero 섹션)
+   - 검색어 입력 시 `api.search.searchModels()` 호출
+   - 검색 중에는 Recent/Popular 탭 숨김
+   - Clear 버튼으로 검색 초기화
+   - 모바일 반응형 검색 UI
+
+5. **모바일 UX 개선**
+   - 모바일 메뉴: Explore, Generate, Training만 표시
+   - "Create Model" 버튼 → "Generate" 버튼으로 변경
+   - 모바일에서 검색창 세로 레이아웃 (버튼 전체 너비)
+
+6. **Navigation 구조 개선**
+   - Desktop: Explore, Generate, Training (3개 탭)
+   - Mobile: 햄버거 메뉴로 모든 네비게이션 제공
+   - 로그인 사용자: Profile, My Models, Favorites 메뉴 추가
+
 ---
 
 ## 실행 화면

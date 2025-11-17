@@ -20,15 +20,15 @@ src/
 ├── assets/
 │   └── main.css              # 재사용 가능한 유틸리티 CSS 클래스 (모노톤)
 ├── components/
-│   ├── Navigation.vue        # 네비게이션 바 (Google OAuth 인증 연동)
+│   ├── Navigation.vue        # 네비게이션 바 (Google OAuth 인증 연동, 모바일 햄버거 메뉴)
 │   └── ModelCard.vue         # 모델 카드 컴포넌트
 ├── views/
-│   ├── ModelList.vue         # 모델 목록 (최신순/인기순, 태그 필터)
+│   ├── ModelList.vue         # 모델 목록 (검색, 최신순/인기순, 태그 필터)
 │   ├── ModelDetail.vue       # 모델 상세 (샘플, 프롬프트, 댓글)
 │   ├── Generate.vue          # 이미지 생성 (SSE 실시간 진행률)
 │   ├── Training.vue          # LoRA 학습 (SSE 실시간 진행률)
-│   ├── Search.vue            # 통합 검색
-│   ├── Profile.vue           # 프로필/내 모델
+│   ├── Profile.vue           # 프로필/내 모델 (실시간 갱신)
+│   ├── AuthCallback.vue      # OAuth2 콜백 처리
 │   └── Login.vue             # 로그인 페이지
 ├── services/
 │   └── api.ts                # REST API 클라이언트 + JWT 인증
@@ -96,6 +96,7 @@ npm run build
 ### 🎯 주요 페이지
 
 #### 모델 탐색 (/)
+- **통합 검색**: 제목, 설명, 캐릭터 이름으로 검색 (Enter 키 또는 Search 버튼)
 - 최신/인기 모델 보기
 - 태그로 필터링
 - 페이지네이션
@@ -107,16 +108,11 @@ npm run build
 - 댓글 및 좋아요
 - 다운로드 기능
 
-#### 검색 (/search)
-- 통합 검색 (모델 + 유저)
-- 인기 태그 표시
-- 최근 검색 기록
-
 #### 프로필 (/profile)
 - 내 모델 관리
 - 즐겨찾기 목록
 - 생성 기록
-- 프로필 수정
+- **프로필 수정**: 닉네임/이미지 변경 시 Navigation 바 자동 갱신 (새로고침 불필요)
 
 #### 이미지 생성 (/generate)
 - **2컬럼 레이아웃**: 왼쪽 설정 / 오른쪽 결과
@@ -199,12 +195,15 @@ await api.community.toggleLike(modelId);
 
 ## 인증 흐름
 
-1. 사용자가 "Login with Google" 클릭
-2. `/api/auth/google`로 리다이렉트 (백엔드)
-3. Google OAuth 인증 후 콜백
-4. 백엔드가 JWT 토큰 발급 후 프론트엔드로 리다이렉트
-5. 프론트엔드가 토큰을 LocalStorage에 저장
-6. 이후 모든 API 요청에 `Authorization: Bearer {token}` 헤더 포함
+1. 사용자가 "Login with Google" 클릭 → `/api/auth/google` 호출
+2. Spring Boot 백엔드가 Google OAuth2 페이지로 리다이렉트
+3. 사용자가 Google에서 인증 완료
+4. Google이 `/login/oauth2/code/google`로 콜백
+5. 백엔드 `OAuth2SuccessHandler`가 JWT 토큰 생성
+6. 프론트엔드 `/auth/callback`로 리다이렉트 (URL Fragment에 토큰 포함)
+7. `AuthCallback.vue`가 Fragment에서 토큰 추출 후 LocalStorage에 저장
+8. 홈(`/`)으로 리다이렉트 (페이지 새로고침으로 Navigation 상태 갱신)
+9. 이후 모든 API 요청에 `Authorization: Bearer {token}` 헤더 자동 포함
 
 ## 개발 노트
 
@@ -230,6 +229,13 @@ await api.community.toggleLike(modelId);
 #### Phase 4: Generate & Training 재작성
 - Generate.vue: 2컬럼 레이아웃, SSE 진행률
 - Training.vue: OpenAPI 스펙 정확히 준수, 3단계 API 호출, SSE 진행률
+
+#### Phase 5: Google OAuth & UI 개선 ✅
+- **Google OAuth 통합**: AuthCallback.vue, URL Fragment 토큰 전달
+- **Navigation 개선**: 로그인 상태 표시, 모바일 햄버거 메뉴
+- **프로필 자동 갱신**: CustomEvent로 Navigation 실시간 업데이트
+- **Search 통합**: Explore 페이지에 검색 기능 추가
+- **모바일 UX**: Create → Generate 버튼 변경, Search 탭 제거
 
 ### 🔧 CORS 설정
 백엔드에서 CORS를 허용해야 합니다:

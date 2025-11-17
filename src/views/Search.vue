@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import ModelCard from '../components/ModelCard.vue';
+import { api, type LoraModel, type SearchUserResponse, type SearchAllResponse } from '../services/api';
 
 const searchQuery = ref('');
 const searchType = ref<'all' | 'models' | 'users'>('all');
 const loading = ref(false);
 
-const modelResults = ref([]);
-const userResults = ref([]);
+const modelResults = ref<LoraModel[]>([]);
+const userResults = ref<SearchUserResponse[]>([]);
 
 const popularTags = ref([
   { id: 1, name: 'Anime', count: 1234 },
@@ -32,31 +33,45 @@ watch(searchQuery, () => {
   }
 });
 
+watch(searchType, () => {
+  if (searchQuery.value.length > 2) {
+    performSearch();
+  }
+});
+
 const performSearch = async () => {
   loading.value = true;
-  // TODO: Call API to search
-  setTimeout(() => {
-    modelResults.value = [
-      {
-        id: 1,
-        title: 'Anime Character Model',
-        description: 'High quality anime character generation',
-        userNickname: 'artist123',
-        likeCount: 245,
-        viewCount: 1250,
-        favoriteCount: 89,
-      },
-    ];
+  modelResults.value = [];
+  userResults.value = [];
+
+  try {
+    if (searchType.value === 'models') {
+      const response = await api.search.searchModels(searchQuery.value);
+      modelResults.value = response.data.content;
+    } else if (searchType.value === 'users') {
+      const response = await api.search.searchUsers(searchQuery.value);
+      userResults.value = response.data.content;
+    } else { // 'all'
+      const response = await api.search.search(searchQuery.value);
+      modelResults.value = response.data.models.content;
+      userResults.value = response.data.users.content;
+    }
+  } catch (error) {
+    console.error('Search failed:', error);
+    // Optionally, set an error message to display in the UI
+  } finally {
     loading.value = false;
-  }, 500);
+  }
 };
 
 const searchByTag = (tagName: string) => {
   searchQuery.value = tagName;
+  searchType.value = 'models'; // Assume tag search is primarily for models
 };
 
 const useRecentSearch = (query: string) => {
   searchQuery.value = query;
+  searchType.value = 'all'; // Assume recent search could be for anything
 };
 </script>
 

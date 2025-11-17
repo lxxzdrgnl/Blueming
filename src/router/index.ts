@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import ModelList from '../views/ModelList.vue';
 import ModelDetail from '../views/ModelDetail.vue';
 import Login from '../views/Login.vue';
+import AuthCallback from '../views/AuthCallback.vue';
 import Profile from '../views/Profile.vue';
 import Search from '../views/Search.vue';
 import Training from '../views/Training.vue';
@@ -44,6 +45,11 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: Login,
+    },
+    {
+      path: '/auth/callback',
+      name: 'auth-callback',
+      component: AuthCallback,
     },
     {
       path: '/profile',

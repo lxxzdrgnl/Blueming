@@ -23,6 +23,16 @@ const statusMessage = ref('');
 
 const trainingHistory = ref<any[]>([]);
 
+// Image upload state
+const selectedImages = ref<File[]>([]);
+const imagePreviewUrls = ref<string[]>([]);
+const isDragging = ref(false);
+const uploadError = ref('');
+const fileInput = ref<HTMLInputElement | null>(null); // Explicitly type fileInput ref
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 let eventSource: EventSource | null = null;
 
 onMounted(async () => {
@@ -38,6 +48,113 @@ const loadTrainingHistory = async () => {
   }
 };
 
+// Image validation
+const validateImageFile = (file: File): string | null => {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return `${file.name}: 허용되지 않는 파일 형식입니다. (jpg, jpeg, png, webp만 가능)`;
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return `${file.name}: 파일 크기가 10MB를 초과합니다.`;
+  }
+  return null;
+};
+
+// Handle file input change
+const handleFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.files) {
+    addFiles(Array.from(target.files));
+  }
+};
+
+// Handle drag and drop
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault();
+  isDragging.value = true;
+};
+
+const handleDragLeave = (event: DragEvent) => {
+  event.preventDefault();
+  isDragging.value = false;
+};
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault();
+  isDragging.value = false;
+
+  if (event.dataTransfer?.files) {
+    addFiles(Array.from(event.dataTransfer.files));
+  }
+};
+
+// Add files with validation
+const addFiles = (files: File[]) => {
+  uploadError.value = '';
+
+  for (const file of files) {
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      uploadError.value = validationError;
+      continue;
+    }
+
+    selectedImages.value.push(file);
+
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        imagePreviewUrls.value.push(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Update training images count
+  trainingImagesCount.value = selectedImages.value.length;
+};
+
+// Remove image
+const removeImage = (index: number) => {
+  selectedImages.value.splice(index, 1);
+  imagePreviewUrls.value.splice(index, 1);
+  trainingImagesCount.value = selectedImages.value.length;
+};
+
+// Upload images to S3
+const uploadImagesToS3 = async (): Promise<boolean> => {
+  if (selectedImages.value.length === 0) {
+    error.value = '업로드할 이미지를 선택해주세요.';
+    return false;
+  }
+
+  statusMessage.value = 'Uploading images to S3...';
+
+  try {
+    for (let i = 0; i < selectedImages.value.length; i++) {
+      const file = selectedImages.value[i];
+      if (!file) { // Add null check for file
+        console.warn(`Skipping undefined file at index ${i}`);
+        continue;
+      }
+      statusMessage.value = `Uploading image ${i + 1}/${selectedImages.value.length}...`;
+
+      // Get presigned URL
+      const urlResponse = await api.upload.getPresignedUrl(file.name);
+      const presignedUrl = urlResponse.data.presignedUrl;
+
+      // Upload to S3
+      await api.upload.uploadToS3(presignedUrl, file);
+    }
+
+    statusMessage.value = 'All images uploaded successfully!';
+    return true;
+  } catch (err) {
+    error.value = `Failed to upload images: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    return false;
+  }
+};
+
 const startTraining = async () => {
   if (!title.value.trim()) {
     error.value = 'Please enter a model title';
@@ -47,11 +164,20 @@ const startTraining = async () => {
   try {
     isTraining.value = true;
     error.value = '';
+    uploadError.value = '';
     currentEpoch.value = 0;
     totalEpochs.value = epochs.value;
+
+    // 1. Upload images to S3
+    const uploadSuccess = await uploadImagesToS3();
+    if (!uploadSuccess) {
+      isTraining.value = false;
+      return;
+    }
+
     statusMessage.value = 'Creating model...';
 
-    // 1. Create model with training parameters
+    // 2. Create model with training parameters
     const modelResponse = await api.training.createModel({
       title: title.value,
       description: description.value,
@@ -68,12 +194,12 @@ const startTraining = async () => {
     modelId.value = modelResponse.data.id;
     statusMessage.value = 'Creating training job...';
 
-    // 2. Create training job
+    // 3. Create training job
     const jobResponse = await api.training.createTrainingJob(modelId.value);
     trainingJobId.value = jobResponse.data.id;
     statusMessage.value = 'Starting training...';
 
-    // 3. Start training
+    // 4. Start training
     await api.training.startTraining(trainingJobId.value, {
       epochs: epochs.value,
       learningRate: learningRate.value,
@@ -82,7 +208,7 @@ const startTraining = async () => {
 
     statusMessage.value = 'Training started...';
 
-    // 4. Connect to SSE for progress
+    // 5. Connect to SSE for progress
     connectToProgressStream();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to start training';
@@ -229,6 +355,60 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <!-- Image Upload Section -->
+            <div class="form-group">
+              <label class="label">Training Images</label>
+              <div
+                class="upload-zone"
+                :class="{ 'upload-zone-dragging': isDragging }"
+                @dragover="handleDragOver"
+                @dragleave="handleDragLeave"
+                @drop="handleDrop"
+                @click="() => fileInput?.click()"
+              >
+                <input
+                  ref="fileInput"
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  style="display: none;"
+                  :disabled="isTraining"
+                  @change="handleFileSelect"
+                />
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="upload-icon">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="upload-text">클릭하거나 이미지를 드래그하여 업로드</p>
+                <p class="upload-hint">JPG, JPEG, PNG, WEBP (최대 10MB)</p>
+              </div>
+
+              <!-- Upload Error -->
+              <div v-if="uploadError" class="upload-error mt-sm">
+                {{ uploadError }}
+              </div>
+
+              <!-- Image Previews -->
+              <div v-if="imagePreviewUrls.length > 0" class="image-preview-grid mt-md">
+                <div v-for="(url, index) in imagePreviewUrls" :key="index" class="image-preview-item">
+                  <img :src="url" :alt="`Preview ${index + 1}`" class="preview-image" />
+                  <button
+                    v-if="!isTraining"
+                    class="remove-image-btn"
+                    @click.stop="removeImage(index)"
+                    title="Remove image"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                  <div class="image-name">{{ selectedImages[index]?.name }}</div>
+                </div>
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-md">
               <div class="form-group">
                 <label class="label">Training Images Count</label>
@@ -238,7 +418,8 @@ onUnmounted(() => {
                   min="5"
                   max="200"
                   class="input"
-                  :disabled="isTraining"
+                  :disabled="true"
+                  readonly
                 />
               </div>
 
@@ -448,9 +629,117 @@ onUnmounted(() => {
   text-transform: uppercase;
 }
 
+/* Image Upload Styles */
+.upload-zone {
+  border: 2px dashed var(--text-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: var(--bg-secondary);
+}
+
+.upload-zone:hover {
+  border-color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.upload-zone-dragging {
+  border-color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.upload-icon {
+  margin: 0 auto var(--space-md);
+  color: var(--text-secondary);
+}
+
+.upload-text {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.upload-hint {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.upload-error {
+  color: #ef4444;
+  font-size: 14px;
+  padding: var(--space-sm);
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+.image-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-md);
+}
+
+.image-preview-item {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border: 1px solid var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.image-preview-item:hover {
+  border-color: var(--text-secondary);
+  transform: translateY(-2px);
+}
+
+.preview-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: var(--radius-full);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.remove-image-btn:hover {
+  background: #ef4444;
+  transform: scale(1.1);
+}
+
+.image-name {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--bg-primary);
+}
+
 @media (max-width: 1024px) {
   .grid-cols-2 {
     grid-template-columns: 1fr;
+  }
+
+  .image-preview-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
 }
 </style>

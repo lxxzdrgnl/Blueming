@@ -3,12 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { api, type GenerateConfig } from '../services/api';
 
 const config = ref<GenerateConfig>({
+  modelId: 1, // Placeholder modelId, needs to be dynamically selected
   prompt: 'sks, 1girl, black hair, long hair, black and white manga style',
-  lora_path: 'my_lora_model',
-  num_images: 2,
   steps: 40,
-  guidance_scale: 7.5,
-  negative_prompt: 'ugly, blurry, low quality, distorted',
+  guidanceScale: 7.5,
+  negativePrompt: 'ugly, blurry, low quality, distorted',
   seed: undefined,
 });
 
@@ -36,22 +35,10 @@ const generateImages = async () => {
     currentStep.value = 0;
     totalSteps.value = 0;
 
-    // Start image generation (background task)
-    const response = await fetch('http://127.0.0.1:8000/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(config.value),
-    });
+    // Start image generation using the API service
+    const response = await api.generation.generateImage(config.value);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to start generation');
-    }
-
-    const data = await response.json();
-    statusMessage.value = data.message;
+    statusMessage.value = response.message;
 
     // Connect to SSE stream for real-time progress
     connectToStream();
@@ -212,37 +199,17 @@ onUnmounted(() => {
       <label for="negative-prompt">Negative Prompt:</label>
       <textarea
         id="negative-prompt"
-        v-model="config.negative_prompt"
+        v-model="config.negativePrompt"
         rows="2"
         placeholder="ugly, blurry, low quality..."
         :disabled="isGenerating"
       />
     </div>
 
-    <div class="form-group">
-      <label for="lora-path">LoRA Model Path:</label>
-      <input
-        id="lora-path"
-        v-model="config.lora_path"
-        type="text"
-        placeholder="my_lora_model"
-        :disabled="isGenerating"
-      />
-    </div>
+    <!-- Removed lora_path as it's not part of GenerateConfig -->
 
     <div class="form-row">
-      <div class="form-group">
-        <label for="num-images">Number of Images:</label>
-        <input
-          id="num-images"
-          v-model.number="config.num_images"
-          type="number"
-          min="1"
-          max="10"
-          :disabled="isGenerating"
-        />
-      </div>
-
+      <!-- Removed num_images as it's not part of GenerateConfig -->
       <div class="form-group">
         <label for="steps">Steps:</label>
         <input
@@ -261,7 +228,7 @@ onUnmounted(() => {
         <label for="guidance">Guidance Scale:</label>
         <input
           id="guidance"
-          v-model.number="config.guidance_scale"
+          v-model.number="config.guidanceScale"
           type="number"
           min="1"
           max="20"

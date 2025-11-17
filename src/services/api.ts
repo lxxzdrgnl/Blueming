@@ -76,6 +76,15 @@ export interface UserResponse {
   createdAt: string;
 }
 
+export interface SearchUserResponse extends UserResponse {
+  modelsCount: number;
+}
+
+export interface SearchAllResponse {
+  models: PageResponse<LoraModel>;
+  users: PageResponse<SearchUserResponse>;
+}
+
 export interface CommentResponse {
   id: number;
   modelId: number;
@@ -100,6 +109,33 @@ export interface TrainingJobResponse {
   startedAt?: string;
   completedAt?: string;
   createdAt: string;
+}
+
+export interface GenerateConfig {
+  modelId: number;
+  prompt: string;
+  negativePrompt?: string;
+  steps?: number;
+  guidanceScale?: number;
+  seed?: number;
+}
+
+export interface TrainConfig {
+  modelId: number;
+  epochs?: number;
+  learningRate?: number;
+  loraRank?: number;
+  baseModel?: string;
+  isPublic?: boolean;
+}
+
+export interface GenerationProgressResponse {
+  status: string; // Added status property
+  current_step: number;
+  total_steps: number;
+  message: string;
+  image_urls: string[];
+  error?: string;
 }
 
 // ========== Auth Helper ==========
@@ -340,6 +376,30 @@ export const api = {
     },
   },
 
+  // ========== Upload ==========
+  upload: {
+    async getPresignedUrl(fileName: string): Promise<ApiResponse<{ presignedUrl: string }>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/upload-url?fileName=${encodeURIComponent(fileName)}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async uploadToS3(presignedUrl: string, file: File): Promise<void> {
+      const response = await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to upload file to S3');
+      }
+    },
+  },
+
   // ========== Training ==========
   training: {
     async createModel(data: {
@@ -437,7 +497,7 @@ export const api = {
       return handleResponse(response);
     },
 
-    streamGenerationProgress(onMessage: (data: Record<string, unknown>) => void): EventSource {
+    streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
       const eventSource = new EventSource(`${API_BASE_URL}/api/generate/stream`);
       eventSource.onmessage = (event) => {
         onMessage(JSON.parse(event.data));
@@ -448,7 +508,7 @@ export const api = {
 
   // ========== Search ==========
   search: {
-    async search(query: string, page = 0, size = 20): Promise<ApiResponse<Record<string, unknown>>> {
+    async search(query: string, page = 0, size = 20): Promise<ApiResponse<SearchAllResponse>> {
       const response = await fetch(
         `${API_BASE_URL}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
@@ -459,6 +519,14 @@ export const api = {
     async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
         `${API_BASE_URL}/api/search/models?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        { headers: getAuthHeaders() }
+      );
+      return handleResponse(response);
+    },
+
+    async searchUsers(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<SearchUserResponse>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/search/users?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);

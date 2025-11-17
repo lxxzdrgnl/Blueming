@@ -9,6 +9,7 @@ const error = ref('');
 const activeTab = ref<'recent' | 'popular'>('recent');
 const selectedTags = ref<string[]>([]);
 const popularTags = ref<TagResponse[]>([]);
+const searchQuery = ref('');
 
 // Pagination
 const currentPage = ref(0);
@@ -36,7 +37,10 @@ const fetchModels = async () => {
   try {
     let response;
 
-    if (selectedTags.value.length > 0) {
+    if (searchQuery.value.trim()) {
+      // Search by query
+      response = await api.search.searchModels(searchQuery.value, currentPage.value, pageSize);
+    } else if (selectedTags.value.length > 0) {
       response = await api.models.filterByTags(selectedTags.value, currentPage.value, pageSize);
     } else if (activeTab.value === 'popular') {
       response = await api.models.getPopularModels(currentPage.value, pageSize);
@@ -77,6 +81,18 @@ const goToPage = (page: number) => {
   fetchModels();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+const handleSearch = () => {
+  currentPage.value = 0;
+  selectedTags.value = [];
+  fetchModels();
+};
+
+const clearSearch = () => {
+  searchQuery.value = '';
+  currentPage.value = 0;
+  fetchModels();
+};
 </script>
 
 <template>
@@ -86,16 +102,47 @@ const goToPage = (page: number) => {
       <h1 class="text-4xl font-bold gradient-text mb-md">
         Explore LoRA Models
       </h1>
-      <p class="text-lg text-secondary">
+      <p class="text-lg text-secondary mb-lg">
         Discover and share amazing AI models created by the community
       </p>
+
+      <!-- Search Bar -->
+      <div class="search-container" style="max-width: 600px; margin: 0 auto;">
+        <div class="flex gap-sm">
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="input flex-1"
+            placeholder="Search models by title, description, or character..."
+            @keyup.enter="handleSearch"
+          />
+          <button class="btn btn-primary" @click="handleSearch">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            Search
+          </button>
+          <button v-if="searchQuery" class="btn btn-secondary" @click="clearSearch">
+            Clear
+          </button>
+        </div>
+      </div>
     </section>
+
+    <!-- Search Results Info -->
+    <div v-if="searchQuery" class="card mb-lg p-md text-center">
+      <p class="text-secondary">
+        Search results for "<span class="text-primary font-semibold">{{ searchQuery }}</span>"
+        <button class="btn btn-sm btn-secondary ml-sm" @click="clearSearch">Clear</button>
+      </p>
+    </div>
 
     <!-- Filters -->
     <section class="filters mb-xl">
       <div class="flex items-center justify-between mb-lg flex-wrap gap-md">
         <!-- Tabs -->
-        <div class="tabs-group flex gap-sm">
+        <div class="tabs-group flex gap-sm" v-if="!searchQuery">
           <button
             class="btn"
             :class="activeTab === 'recent' ? 'btn-primary' : 'btn-secondary'"
@@ -112,13 +159,13 @@ const goToPage = (page: number) => {
           </button>
         </div>
 
-        <!-- Create Button -->
-        <router-link to="/create" class="btn btn-primary">
+        <!-- Generate Button -->
+        <router-link to="/generate" class="btn btn-primary">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          Create Model
+          Generate
         </router-link>
       </div>
 
@@ -240,6 +287,14 @@ const goToPage = (page: number) => {
 
   .tabs-group .btn {
     flex: 1;
+  }
+
+  .search-container .flex {
+    flex-direction: column;
+  }
+
+  .search-container .btn {
+    width: 100%;
   }
 }
 </style>

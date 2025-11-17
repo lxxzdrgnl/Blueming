@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import ModelCard from '../components/ModelCard.vue';
+import { api, authStore, type UserResponse, type LoraModel } from '../services/api';
 
-const user = ref({
-  id: 1,
-  nickname: 'artist123',
-  name: 'John Doe',
-  email: 'john@example.com',
-  profileImageUrl: 'https://via.placeholder.com/120',
-  createdAt: '2024-01-01',
-});
+const router = useRouter();
 
+const user = ref<UserResponse | null>(null);
 const isEditing = ref(false);
 const editForm = ref({
   nickname: '',
@@ -18,29 +14,68 @@ const editForm = ref({
 });
 
 const activeTab = ref<'models' | 'favorites' | 'history'>('models');
+const loading = ref(true);
+const myModels = ref<LoraModel[]>([]);
+const favoriteModels = ref<LoraModel[]>([]);
+const generationHistory = ref<any[]>([]);
 
-const myModels = ref([
-  {
-    id: 1,
-    title: 'My Anime Model',
-    description: 'Personal anime character model',
-    userNickname: 'artist123',
-    likeCount: 45,
-    viewCount: 250,
-    favoriteCount: 20,
-  },
-]);
+onMounted(async () => {
+  // Check if user is logged in
+  if (!authStore.isAuthenticated()) {
+    router.push('/login');
+    return;
+  }
 
-const favoriteModels = ref([]);
-const generationHistory = ref([]);
-
-onMounted(() => {
-  // TODO: Fetch user data from API
-  editForm.value = {
-    nickname: user.value.nickname,
-    profileImageUrl: user.value.profileImageUrl,
-  };
+  await loadUserProfile();
+  await loadMyModels();
+  await loadFavoriteModels();
+  await loadGenerationHistory();
 });
+
+const loadUserProfile = async () => {
+  try {
+    const response = await api.user.getMyProfile();
+    user.value = response.data;
+    editForm.value = {
+      nickname: user.value.nickname,
+      profileImageUrl: user.value.profileImageUrl || '',
+    };
+  } catch (error) {
+    console.error('Failed to load user profile:', error);
+    // Token might be expired
+    authStore.clearTokens();
+    router.push('/login');
+  }
+};
+
+const loadMyModels = async () => {
+  try {
+    const response = await api.models.getMyModels(0, 20);
+    myModels.value = response.data.content;
+  } catch (error) {
+    console.error('Failed to load my models:', error);
+  }
+};
+
+const loadFavoriteModels = async () => {
+  try {
+    const response = await api.community.getFavoriteModels(0, 20);
+    favoriteModels.value = response.data.content;
+  } catch (error) {
+    console.error('Failed to load favorite models:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadGenerationHistory = async () => {
+  try {
+    const response = await api.generation.getMyGenerationHistory(0, 20);
+    generationHistory.value = response.data.content;
+  } catch (error) {
+    console.error('Failed to load generation history:', error);
+  }
+};
 
 const startEdit = () => {
   isEditing.value = true;
@@ -48,133 +83,198 @@ const startEdit = () => {
 
 const cancelEdit = () => {
   isEditing.value = false;
-  editForm.value = {
-    nickname: user.value.nickname,
-    profileImageUrl: user.value.profileImageUrl,
-  };
+  if (user.value) {
+    editForm.value = {
+      nickname: user.value.nickname,
+      profileImageUrl: user.value.profileImageUrl || '',
+    };
+  }
 };
 
-const saveProfile = () => {
-  // TODO: Call API to update profile
-  user.value.nickname = editForm.value.nickname;
-  user.value.profileImageUrl = editForm.value.profileImageUrl;
-  isEditing.value = false;
+const saveProfile = async () => {
+  try {
+    const response = await api.user.updateMyProfile({
+      nickname: editForm.value.nickname,
+      profileImageUrl: editForm.value.profileImageUrl || undefined,
+    });
+    user.value = response.data;
+    isEditing.value = false;
+
+    // Dispatch custom event to update Navigation
+    window.dispatchEvent(new CustomEvent('profile-updated', {
+      detail: response.data
+    }));
+  } catch (error) {
+    console.error('Failed to update profile:', error);
+    alert('Failed to update profile. Please try again.');
+  }
 };
 </script>
 
 <template>
-  <div class="profile-page">
-    <!-- Profile Header -->
-    <div class="profile-header card mb-xl">
-      <div class="flex items-start gap-lg flex-col-mobile">
-        <!-- Avatar -->
-        <div class="avatar-section">
-          <img :src="user.profileImageUrl" alt="Profile" class="profile-avatar" />
-        </div>
-
-        <!-- User Info -->
-        <div class="flex-1">
-          <template v-if="!isEditing">
-            <h1 class="text-3xl font-bold mb-sm">{{ user.nickname }}</h1>
-            <p class="text-secondary mb-md">{{ user.email }}</p>
-            <p class="text-sm text-muted">Member since {{ new Date(user.createdAt).toLocaleDateString() }}</p>
-          </template>
-
-          <template v-else>
-            <div class="form-group">
-              <label class="label">Nickname</label>
-              <input v-model="editForm.nickname" type="text" class="input" />
-            </div>
-            <div class="form-group">
-              <label class="label">Profile Image URL</label>
-              <input v-model="editForm.profileImageUrl" type="text" class="input" />
-            </div>
-          </template>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex gap-sm">
-          <template v-if="!isEditing">
-            <button class="btn btn-primary" @click="startEdit">Edit Profile</button>
-          </template>
-          <template v-else>
-            <button class="btn btn-secondary" @click="cancelEdit">Cancel</button>
-            <button class="btn btn-primary" @click="saveProfile">Save</button>
-          </template>
-        </div>
-      </div>
+  <div class="container">
+    <!-- Loading State -->
+    <div v-if="loading" class="flex flex-col items-center justify-center" style="min-height: 60vh;">
+      <div class="loading"></div>
+      <p class="text-lg text-secondary mt-lg">Loading profile...</p>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs-container mb-lg">
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'models' }"
-        @click="activeTab = 'models'"
-      >
-        My Models
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'favorites' }"
-        @click="activeTab = 'favorites'"
-      >
-        Favorites
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'history' }"
-        @click="activeTab = 'history'"
-      >
-        Generation History
-      </button>
-    </div>
+    <!-- Profile Content -->
+    <div v-else-if="user">
+      <!-- Profile Header Card -->
+      <div class="card mb-xl">
+        <div class="flex items-start gap-lg flex-col-mobile">
+          <!-- Avatar -->
+          <img
+            :src="user.profileImageUrl || 'https://via.placeholder.com/120'"
+            alt="Profile"
+            class="profile-avatar rounded-full"
+            style="border: 3px solid var(--border);"
+          />
 
-    <!-- Tab Content -->
-    <div class="tab-content">
-      <!-- My Models -->
-      <div v-if="activeTab === 'models'">
-        <div v-if="myModels.length" class="grid grid-cols-4 gap-lg">
-          <a
-            v-for="model in myModels"
-            :key="model.id"
-            :href="`/models/${model.id}`"
-            style="text-decoration: none; color: inherit;"
-          >
-            <ModelCard
-              :id="model.id"
-              :title="model.title"
-              :description="model.description"
-              :userNickname="model.userNickname"
-              :likeCount="model.likeCount"
-              :viewCount="model.viewCount"
-              :favoriteCount="model.favoriteCount"
-            />
-          </a>
-        </div>
-        <div v-else class="empty-state card text-center py-xl">
-          <p class="text-secondary text-lg mb-md">You haven't created any models yet</p>
-          <a href="/create" class="btn btn-primary">Create Your First Model</a>
+          <!-- User Info -->
+          <div style="flex: 1;">
+            <template v-if="!isEditing">
+              <h1 class="text-3xl font-bold mb-sm">{{ user.nickname }}</h1>
+              <p class="text-secondary mb-md">{{ user.email }}</p>
+              <p class="text-sm text-muted mb-md">Member since {{ new Date(user.createdAt).toLocaleDateString() }}</p>
+
+              <!-- Stats -->
+              <div class="flex gap-lg">
+                <div class="stat-item">
+                  <span class="stat-value">{{ myModels.length }}</span>
+                  <span class="stat-label">Models</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value">{{ favoriteModels.length }}</span>
+                  <span class="stat-label">Favorites</span>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="form-group">
+                <label class="label">Nickname</label>
+                <input v-model="editForm.nickname" type="text" class="input" />
+              </div>
+              <div class="form-group">
+                <label class="label">Profile Image URL</label>
+                <input v-model="editForm.profileImageUrl" type="text" class="input" />
+              </div>
+            </template>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-sm">
+            <button v-if="!isEditing" class="btn btn-primary" @click="startEdit">
+              Edit Profile
+            </button>
+            <template v-else>
+              <button class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+              <button class="btn btn-primary" @click="saveProfile">Save</button>
+            </template>
+          </div>
         </div>
       </div>
 
-      <!-- Favorites -->
-      <div v-if="activeTab === 'favorites'">
-        <div v-if="favoriteModels.length" class="grid grid-cols-4 gap-lg">
-          <!-- Favorite models will be rendered here -->
-        </div>
-        <div v-else class="empty-state card text-center py-xl">
-          <p class="text-secondary text-lg">No favorite models yet</p>
-        </div>
+      <!-- Tabs -->
+      <div class="tabs-container mb-lg">
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'models' }"
+          @click="activeTab = 'models'"
+        >
+          My Models
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'favorites' }"
+          @click="activeTab = 'favorites'"
+        >
+          Favorites
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'history' }"
+          @click="activeTab = 'history'"
+        >
+          Generation History
+        </button>
       </div>
 
-      <!-- Generation History -->
-      <div v-if="activeTab === 'history'">
-        <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
-          <!-- Generation history will be rendered here -->
+      <!-- Tab Content -->
+      <div>
+        <!-- My Models Tab -->
+        <div v-if="activeTab === 'models'">
+          <div v-if="myModels.length" class="grid grid-cols-4 gap-lg">
+            <a
+              v-for="model in myModels"
+              :key="model.id"
+              :href="`/models/${model.id}`"
+              style="text-decoration: none; color: inherit;"
+            >
+              <ModelCard
+                :id="model.id"
+                :title="model.title"
+                :description="model.description"
+                :userNickname="model.userNickname"
+                :likeCount="model.likeCount"
+                :viewCount="model.viewCount"
+                :favoriteCount="model.favoriteCount"
+              />
+            </a>
+          </div>
+          <div v-else class="card text-center p-xl">
+            <p class="text-secondary text-lg mb-md">You haven't created any models yet</p>
+            <a href="/training" class="btn btn-primary">Create Your First Model</a>
+          </div>
         </div>
-        <div v-else class="empty-state card text-center py-xl">
-          <p class="text-secondary text-lg">No generation history yet</p>
+
+        <!-- Favorites Tab -->
+        <div v-if="activeTab === 'favorites'">
+          <div v-if="favoriteModels.length" class="grid grid-cols-4 gap-lg">
+            <a
+              v-for="model in favoriteModels"
+              :key="model.id"
+              :href="`/models/${model.id}`"
+              style="text-decoration: none; color: inherit;"
+            >
+              <ModelCard
+                :id="model.id"
+                :title="model.title"
+                :description="model.description"
+                :userNickname="model.userNickname"
+                :likeCount="model.likeCount"
+                :viewCount="model.viewCount"
+                :favoriteCount="model.favoriteCount"
+              />
+            </a>
+          </div>
+          <div v-else class="card text-center p-xl">
+            <p class="text-secondary text-lg">No favorite models yet</p>
+          </div>
+        </div>
+
+        <!-- Generation History Tab -->
+        <div v-if="activeTab === 'history'">
+          <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
+            <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden">
+              <img
+                v-if="item.imageUrl"
+                :src="item.imageUrl"
+                alt="Generated"
+                class="w-full"
+                style="aspect-ratio: 1; object-fit: cover;"
+              />
+              <div class="p-md">
+                <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
+                <p class="text-sm truncate">{{ item.prompt }}</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="card text-center p-xl">
+            <p class="text-secondary text-lg">No generation history yet</p>
+          </div>
         </div>
       </div>
     </div>
@@ -182,22 +282,10 @@ const saveProfile = () => {
 </template>
 
 <style scoped>
-.profile-page {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg);
-}
-
-.profile-header {
-  padding: var(--space-xl);
-}
-
+/* Profile-specific styles using main.css classes */
 .profile-avatar {
   width: 120px;
   height: 120px;
-  border-radius: var(--radius-full);
-  object-fit: cover;
-  border: 3px solid var(--border);
 }
 
 .tabs-container {
@@ -225,14 +313,28 @@ const saveProfile = () => {
 
 .tab-btn.active {
   color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
+  border-bottom-color: var(--primary);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
 @media (max-width: 768px) {
-  .flex-col-mobile {
-    flex-direction: column;
-  }
-
   .tabs-container {
     overflow-x: auto;
   }

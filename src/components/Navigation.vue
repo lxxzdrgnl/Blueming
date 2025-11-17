@@ -1,31 +1,72 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { authStore, api, type UserResponse } from '../services/api';
 
 const isLoggedIn = ref(false);
 const user = ref<UserResponse | null>(null);
 const showUserMenu = ref(false);
+const showMobileMenu = ref(false);
 
 onMounted(async () => {
   await checkAuthStatus();
+  document.addEventListener('click', handleClickOutside);
+  window.addEventListener('profile-updated', handleProfileUpdate);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+  window.removeEventListener('profile-updated', handleProfileUpdate);
 });
 
 const checkAuthStatus = async () => {
+  console.log('Navigation - checkAuthStatus called');
+  console.log('Navigation - isAuthenticated:', authStore.isAuthenticated());
+  console.log('Navigation - accessToken:', authStore.getAccessToken() ? 'exists' : 'missing');
+
   if (!authStore.isAuthenticated()) {
+    console.log('Navigation - not authenticated');
     isLoggedIn.value = false;
     return;
   }
 
   try {
+    console.log('Navigation - fetching user profile');
     const response = await api.user.getMyProfile();
     user.value = response.data;
     isLoggedIn.value = true;
+    console.log('Navigation - user profile loaded:', user.value.nickname);
   } catch (error) {
-    console.error('Failed to get user profile:', error);
+    console.error('Navigation - failed to get user profile:', error);
     // Token might be expired, clear it
     authStore.clearTokens();
     isLoggedIn.value = false;
   }
+};
+
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.user-menu')) {
+    showUserMenu.value = false;
+  }
+  if (!target.closest('.mobile-menu-container')) {
+    showMobileMenu.value = false;
+  }
+};
+
+const handleProfileUpdate = (event: Event) => {
+  const customEvent = event as CustomEvent;
+  if (customEvent.detail) {
+    user.value = customEvent.detail;
+    console.log('Navigation - profile updated:', user.value.nickname);
+  }
+};
+
+const toggleUserMenu = () => {
+  showUserMenu.value = !showUserMenu.value;
+};
+
+const toggleMobileMenu = () => {
+  showMobileMenu.value = !showMobileMenu.value;
 };
 
 const handleLogin = () => {
@@ -45,6 +86,7 @@ const handleLogout = async () => {
   authStore.clearTokens();
   isLoggedIn.value = false;
   user.value = null;
+  showUserMenu.value = false;
   window.location.href = '/';
 };
 </script>
@@ -60,25 +102,34 @@ const handleLogout = async () => {
           </a>
         </div>
 
-        <!-- Navigation Links -->
+        <!-- Navigation Links (Desktop) -->
         <div class="nav-links flex items-center gap-lg">
           <router-link to="/" class="nav-link">Explore</router-link>
-          <router-link to="/search" class="nav-link">Search</router-link>
           <router-link to="/generate" class="nav-link">Generate</router-link>
           <router-link to="/training" class="nav-link">Training</router-link>
         </div>
 
         <!-- User Section -->
         <div class="nav-user flex items-center gap-md">
+          <!-- Mobile Menu Button -->
+          <button class="mobile-menu-btn" @click="toggleMobileMenu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <!-- Desktop User Menu -->
           <template v-if="isLoggedIn && user">
-            <div class="user-menu" @click="showUserMenu = !showUserMenu">
-              <div class="flex items-center gap-sm cursor-pointer">
+            <div class="user-menu">
+              <div class="flex items-center gap-sm cursor-pointer" @click="toggleUserMenu">
                 <img
                   :src="user.profileImageUrl || 'https://via.placeholder.com/40'"
                   alt="Profile"
                   class="avatar"
                 />
-                <span class="text-primary">{{ user.nickname }}</span>
+                <span class="text-primary font-semibold">{{ user.nickname }}</span>
               </div>
 
               <!-- Dropdown Menu -->
@@ -101,9 +152,48 @@ const handleLogout = async () => {
           </template>
 
           <template v-else>
-            <button @click="handleLogin" class="btn btn-primary btn-sm">Login with Google</button>
+            <button @click="handleLogin" class="btn btn-primary btn-sm desktop-login">Login with Google</button>
           </template>
         </div>
+      </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div v-if="showMobileMenu" class="mobile-menu card">
+      <div class="mobile-menu-content">
+        <!-- Mobile Navigation Links -->
+        <router-link to="/" class="mobile-menu-item" @click="showMobileMenu = false">
+          Explore
+        </router-link>
+        <router-link to="/generate" class="mobile-menu-item" @click="showMobileMenu = false">
+          Generate
+        </router-link>
+        <router-link to="/training" class="mobile-menu-item" @click="showMobileMenu = false">
+          Training
+        </router-link>
+
+        <div class="divider"></div>
+
+        <!-- Mobile User Section -->
+        <template v-if="isLoggedIn && user">
+          <router-link to="/profile" class="mobile-menu-item" @click="showMobileMenu = false">
+            Profile
+          </router-link>
+          <router-link to="/my-models" class="mobile-menu-item" @click="showMobileMenu = false">
+            My Models
+          </router-link>
+          <router-link to="/favorites" class="mobile-menu-item" @click="showMobileMenu = false">
+            Favorites
+          </router-link>
+          <button @click="handleLogout" class="mobile-menu-item">
+            Logout
+          </button>
+        </template>
+        <template v-else>
+          <button @click="handleLogin" class="btn btn-primary w-full">
+            Login with Google
+          </button>
+        </template>
       </div>
     </div>
   </nav>
@@ -159,6 +249,14 @@ const handleLogout = async () => {
   position: relative;
 }
 
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+}
+
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 12px);
@@ -169,6 +267,7 @@ const handleLogout = async () => {
   flex-direction: column;
   gap: var(--space-xs);
   box-shadow: var(--shadow-lg);
+  z-index: 1000;
 }
 
 .dropdown-item {
@@ -190,6 +289,60 @@ const handleLogout = async () => {
   color: var(--text-primary);
 }
 
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--space-xs) 0;
+}
+
+.mobile-menu-btn {
+  display: none;
+  padding: var(--space-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.mobile-menu {
+  position: fixed;
+  top: 76px;
+  left: 0;
+  right: 0;
+  margin: var(--space-md);
+  padding: var(--space-md);
+  z-index: 999;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.mobile-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.mobile-menu-item {
+  padding: var(--space-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 16px;
+  width: 100%;
+  font-weight: 500;
+}
+
+.mobile-menu-item:hover,
+.mobile-menu-item.router-link-active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 @media (max-width: 768px) {
   .nav-links {
     display: none;
@@ -197,6 +350,18 @@ const handleLogout = async () => {
 
   .nav-brand .logo {
     font-size: 18px;
+  }
+
+  .mobile-menu-btn {
+    display: block;
+  }
+
+  .desktop-login {
+    display: none;
+  }
+
+  .user-menu .flex span {
+    display: none;
   }
 }
 </style>

@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { api, type TrainConfig } from '../services/api';
+import { api, type TrainingJobResponse } from '../services/api'; // Import TrainingJobResponse
 
-const config = ref<TrainConfig>({
+interface TrainingPanelConfig {
+  raw_dataset_path: string;
+  output_dir: string;
+  skip_preprocessing: boolean;
+}
+
+const config = ref<TrainingPanelConfig>({
   raw_dataset_path: './dataset',
   output_dir: 'my_lora_model',
   skip_preprocessing: false,
@@ -15,6 +21,8 @@ const totalEpochs = ref(0);
 const currentStep = ref(0);
 const totalSteps = ref(0);
 const errorMessage = ref('');
+const trainingJobId = ref<number | null>(null); // New ref for training job ID
+
 let eventSource: EventSource | null = null;
 let heartbeatTimer: number | null = null;
 const HEARTBEAT_TIMEOUT = 60000; // 60초 동안 업데이트가 없으면 연결 끊김으로 간주
@@ -22,12 +30,31 @@ const HEARTBEAT_TIMEOUT = 60000; // 60초 동안 업데이트가 없으면 연�
 const startTraining = async () => {
   try {
     errorMessage.value = '';
-    const response = await api.startTraining(config.value);
-    statusMessage.value = response.message;
-    isTraining.value = true;
+    // TODO: Implement proper model creation and training job creation flow
+    // For now, using a placeholder jobId and casting config for type compatibility
+    if (trainingJobId.value === null) {
+      // This part needs to be properly implemented to create a model and then a training job
+      // For demonstration, let's assume a modelId of 1 and create a job
+      const modelCreationResponse = await api.training.createModel({
+        title: config.value.output_dir, // Using output_dir as title for now
+        description: 'Training job created from UI',
+        isPublic: false,
+      });
+      const modelId = modelCreationResponse.data.id;
+      const jobCreationResponse = await api.training.createTrainingJob(modelId);
+      trainingJobId.value = jobCreationResponse.data.id;
+    }
 
-    // Connect to SSE stream for real-time progress
-    connectToStream();
+    if (trainingJobId.value !== null) {
+      const response = await api.training.startTraining(trainingJobId.value, config.value as Record<string, unknown>);
+      statusMessage.value = response.message as string; // Assuming message is string
+      isTraining.value = true;
+
+      // Connect to SSE stream for real-time progress
+      connectToStream();
+    } else {
+      errorMessage.value = 'Error: Could not obtain a training job ID.';
+    }
   } catch (error) {
     errorMessage.value = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
@@ -35,17 +62,27 @@ const startTraining = async () => {
 
 const checkServerStatus = async () => {
   try {
-    const status = await api.getTrainingStatus();
-    isTraining.value = status.is_training;
-    statusMessage.value = status.message;
+    // TODO: This needs to be updated to get the actual jobId from somewhere
+    // For now, using a placeholder jobId for type compatibility
+    if (trainingJobId.value === null) {
+      // Attempt to find an existing job or set a default for checking
+      // This is a simplification and needs proper state management
+      console.warn("No trainingJobId available for status check. Skipping.");
+      return;
+    }
+
+    const response = await api.training.getTrainingJob(trainingJobId.value);
+    const status = response.data; // Assuming response.data is TrainingJobResponse
+    isTraining.value = status.status === 'RUNNING' || status.status === 'PENDING';
+    statusMessage.value = `Job ${status.id}: ${status.status}`;
 
     // 서버가 학습 중이라면 SSE 연결 시작
-    if (status.is_training) {
+    if (isTraining.value) {
       connectToStream();
     }
   } catch (error) {
     console.error('Failed to check server status:', error);
-    errorMessage.value = 'Failed to connect to server';
+    errorMessage.value = 'Failed to connect to server or retrieve job status';
   }
 };
 
@@ -89,6 +126,7 @@ const connectToStream = () => {
 
   errorMessage.value = '';
 
+  // TODO: The SSE stream URL should ideally be dynamic or come from the API
   eventSource = new EventSource('http://127.0.0.1:8000/train/stream');
 
   eventSource.onopen = () => {
